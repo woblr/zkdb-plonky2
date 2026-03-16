@@ -1,0 +1,48 @@
+{
+  "run_id": "29d86d54-9ee5-4eb6-a75a-ee54b563700e",
+  "scenario": {
+    "name": "txn_sort_amount_asc",
+    "description": "Sort transactions by amount ascending",
+    "sql": "SELECT id, amount FROM benchmark_transactions ORDER BY amount ASC",
+    "row_count": 1000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "sort",
+      "asc",
+      "transactions"
+    ],
+    "query_family": "sort",
+    "operator_family": "sort",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "4f5bb847-c308-4dbe-8215-ed0884211731",
+  "snapshot_id": "2e95b0d2-2915-4872-a8ab-70d71c0e909b",
+  "query_id": "3d87ab45-d768-4cd9-a98a-f821c9e48e5b",
+  "proof_id": "94ce32ee-194d-4b80-8537-8c7c33a6faa8",
+  "metrics": {
+    "dataset_generation_us": 173,
+    "ingestion_us": 4774,
+    "snapshot_creation_us": 5292,
+    "snapshot_activation_us": 18,
+    "query_planning_us": 123,
+    "proof_generation_us": 4782,
+    "verification_us": 40,
+    "total_us": 15209,
+    "proof_size_bytes": 722,
+    "verification_key_size_bytes": 134,
+    "row_count": 1000,
+    "chunk_count": 4,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670557430,
+  "finished_at_ms": 1773670557445
+}

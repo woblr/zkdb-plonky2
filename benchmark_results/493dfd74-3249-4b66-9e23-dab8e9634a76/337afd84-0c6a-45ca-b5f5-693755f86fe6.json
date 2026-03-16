@@ -1,0 +1,48 @@
+{
+  "run_id": "337afd84-0c6a-45ca-b5f5-693755f86fe6",
+  "scenario": {
+    "name": "filter_count",
+    "description": "Filtered COUNT on boolean column",
+    "sql": "SELECT COUNT(*) FROM benchmark_transactions WHERE flag = true",
+    "row_count": 5000,
+    "chunk_size": 1024,
+    "backend": "constraint_checked",
+    "tags": [
+      "filter",
+      "aggregate",
+      "count"
+    ],
+    "query_family": "filter",
+    "operator_family": "filter_aggregate",
+    "complexity_class": "linear"
+  },
+  "dataset_id": "ea014d4a-fa08-49b7-8179-a71eb7b5cc65",
+  "snapshot_id": "6f5cb4a9-12fa-4c42-939b-15e815732d83",
+  "query_id": "2e2a7279-7321-418d-a1f4-47c03f3caa5d",
+  "proof_id": "b2aa7638-7641-43da-8cbb-3a65bb0ef419",
+  "metrics": {
+    "dataset_generation_us": 879,
+    "ingestion_us": 24201,
+    "snapshot_creation_us": 27294,
+    "snapshot_activation_us": 18,
+    "query_planning_us": 164,
+    "proof_generation_us": 21166,
+    "verification_us": 42,
+    "total_us": 73771,
+    "proof_size_bytes": 726,
+    "verification_key_size_bytes": 140,
+    "row_count": 5000,
+    "chunk_count": 5,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670571042,
+  "finished_at_ms": 1773670571116
+}

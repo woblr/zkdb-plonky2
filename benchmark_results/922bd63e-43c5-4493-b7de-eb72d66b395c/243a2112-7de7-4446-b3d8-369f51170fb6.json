@@ -1,0 +1,48 @@
+{
+  "run_id": "243a2112-7de7-4446-b3d8-369f51170fb6",
+  "scenario": {
+    "name": "txn_sort_score_desc",
+    "description": "Sort transactions by score descending",
+    "sql": "SELECT id, user_id, score FROM benchmark_transactions ORDER BY score DESC",
+    "row_count": 500,
+    "chunk_size": 256,
+    "backend": "mock",
+    "tags": [
+      "sort",
+      "desc",
+      "transactions"
+    ],
+    "query_family": "sort",
+    "operator_family": "sort",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "3520de54-5dc6-47a3-a1da-6f161338d23e",
+  "snapshot_id": "abe75af7-3dd9-4493-ab6d-5da66136517e",
+  "query_id": "d3b9d17e-95ec-4d1a-8554-10b26b924bb7",
+  "proof_id": "c3eee407-3972-4394-a1c2-c7c897e80ce2",
+  "metrics": {
+    "dataset_generation_us": 88,
+    "ingestion_us": 2436,
+    "snapshot_creation_us": 2878,
+    "snapshot_activation_us": 21,
+    "query_planning_us": 156,
+    "proof_generation_us": 2856,
+    "verification_us": 2,
+    "total_us": 8441,
+    "proof_size_bytes": 32,
+    "verification_key_size_bytes": 32,
+    "row_count": 500,
+    "chunk_count": 2,
+    "quality": {
+      "proof_generation_time": "placeholder",
+      "verification_time": "placeholder",
+      "proof_size": "placeholder",
+      "vk_size": "placeholder",
+      "overall": "placeholder"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773656509123,
+  "finished_at_ms": 1773656509132
+}

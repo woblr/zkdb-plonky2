@@ -1,0 +1,68 @@
+[package]
+name = "zkdb-plonky2"
+version = "0.1.0"
+edition = "2021"
+description = "Zero-knowledge database with snapshot-based proving"
+
+[[bin]]
+name = "zkdb"
+path = "src/main.rs"
+
+[lib]
+name = "zkdb_plonky2"
+path = "src/lib.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Web framework
+axum = { version = "0.7", features = ["json", "macros"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# IDs
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Hashing
+blake3 = "1"
+sha2 = "0.10"
+hex = "0.4"
+
+# Concurrency / collections
+dashmap = "5"
+parking_lot = "0.12"
+
+# SQL parsing
+sqlparser = "0.44"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Async trait
+async-trait = "0.1"
+
+# HTTP types
+http = "1"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Random / misc
+rand = "0.8"
+bytes = "1"
+
+[dev-dependencies]
+tokio-test = "0.4"

@@ -1,0 +1,48 @@
+{
+  "run_id": "e6fd32e0-8c97-4bf2-a04b-f0e6a4d6aae5",
+  "scenario": {
+    "name": "emp_group_by_department_avg_salary",
+    "description": "GROUP BY department, AVG(salary) — requires sum + count per group",
+    "sql": "SELECT department, AVG(salary) FROM benchmark_employees GROUP BY department",
+    "row_count": 1000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "group_by",
+      "avg",
+      "employees"
+    ],
+    "query_family": "group_by",
+    "operator_family": "group_by_aggregate",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "3d0f762f-4fa5-4789-b10e-d4a86eb1850b",
+  "snapshot_id": "a1c0a14e-aedf-4541-bb9e-711173dc50af",
+  "query_id": "3159b7c8-fdd6-4717-a8b1-01c3bf75dd8c",
+  "proof_id": "c7a4b099-db66-4840-a45b-ddeed95feaf2",
+  "metrics": {
+    "dataset_generation_us": 177,
+    "ingestion_us": 4825,
+    "snapshot_creation_us": 5242,
+    "snapshot_activation_us": 16,
+    "query_planning_us": 132,
+    "proof_generation_us": 4259,
+    "verification_us": 35,
+    "total_us": 14691,
+    "proof_size_bytes": 730,
+    "verification_key_size_bytes": 140,
+    "row_count": 1000,
+    "chunk_count": 4,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670557312,
+  "finished_at_ms": 1773670557327
+}

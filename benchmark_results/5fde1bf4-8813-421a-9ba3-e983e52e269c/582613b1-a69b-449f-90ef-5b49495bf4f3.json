@@ -1,0 +1,48 @@
+{
+  "run_id": "582613b1-a69b-449f-90ef-5b49495bf4f3",
+  "scenario": {
+    "name": "emp_sort_salary_asc",
+    "description": "Sort employees by salary ascending — full permutation circuit",
+    "sql": "SELECT employee_id, salary FROM benchmark_employees ORDER BY salary ASC",
+    "row_count": 1000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "sort",
+      "asc",
+      "employees"
+    ],
+    "query_family": "sort",
+    "operator_family": "sort",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "c4f349f7-9f20-4869-a22c-4c423539fa75",
+  "snapshot_id": "c4cf29eb-5fc2-49e8-a1da-dfb9217c3f1e",
+  "query_id": "17bb1c40-8862-4110-bf6a-17b4e6e94d6d",
+  "proof_id": "4b69774e-d2e0-40b2-bf3d-c72f3765ba17",
+  "metrics": {
+    "dataset_generation_us": 173,
+    "ingestion_us": 4808,
+    "snapshot_creation_us": 5258,
+    "snapshot_activation_us": 14,
+    "query_planning_us": 103,
+    "proof_generation_us": 4798,
+    "verification_us": 34,
+    "total_us": 15194,
+    "proof_size_bytes": 718,
+    "verification_key_size_bytes": 134,
+    "row_count": 1000,
+    "chunk_count": 4,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670557371,
+  "finished_at_ms": 1773670557386
+}

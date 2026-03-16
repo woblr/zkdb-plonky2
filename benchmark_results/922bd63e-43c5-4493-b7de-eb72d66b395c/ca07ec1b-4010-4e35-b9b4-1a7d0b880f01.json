@@ -1,0 +1,48 @@
+{
+  "run_id": "ca07ec1b-4010-4e35-b9b4-1a7d0b880f01",
+  "scenario": {
+    "name": "emp_top50_performance",
+    "description": "Top-50 employees by performance score — sort + limit",
+    "sql": "SELECT employee_id, department, performance_score FROM benchmark_employees ORDER BY performance_score DESC LIMIT 50",
+    "row_count": 500,
+    "chunk_size": 256,
+    "backend": "mock",
+    "tags": [
+      "sort",
+      "top_k",
+      "employees"
+    ],
+    "query_family": "sort",
+    "operator_family": "sort",
+    "complexity_class": "moderate"
+  },
+  "dataset_id": "6f7d0f88-5420-4bd8-896a-ebc8312b70f9",
+  "snapshot_id": "00129088-5bcf-4b2e-8d55-6cd1198cf94b",
+  "query_id": "8d5e25dd-c63b-49a9-bb2d-b08ff987db5b",
+  "proof_id": "fec76e47-6132-44cb-9010-d73bf26155c5",
+  "metrics": {
+    "dataset_generation_us": 88,
+    "ingestion_us": 2334,
+    "snapshot_creation_us": 2654,
+    "snapshot_activation_us": 12,
+    "query_planning_us": 102,
+    "proof_generation_us": 2413,
+    "verification_us": 1,
+    "total_us": 7609,
+    "proof_size_bytes": 32,
+    "verification_key_size_bytes": 32,
+    "row_count": 500,
+    "chunk_count": 2,
+    "quality": {
+      "proof_generation_time": "placeholder",
+      "verification_time": "placeholder",
+      "proof_size": "placeholder",
+      "vk_size": "placeholder",
+      "overall": "placeholder"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773656509108,
+  "finished_at_ms": 1773656509115
+}

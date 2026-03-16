@@ -1,0 +1,47 @@
+{
+  "run_id": "428b6dba-78e1-4075-967e-d51c4de10c4a",
+  "scenario": {
+    "name": "filter_projection",
+    "description": "Filter rows by amount threshold + project 3 columns",
+    "sql": "SELECT id, amount, region FROM benchmark_transactions WHERE amount > 50000",
+    "row_count": 500,
+    "chunk_size": 256,
+    "backend": "mock",
+    "tags": [
+      "filter",
+      "projection"
+    ],
+    "query_family": "filter",
+    "operator_family": "filter_project",
+    "complexity_class": "linear"
+  },
+  "dataset_id": "d258ff96-1044-4f75-b1c9-ac9a070a81b8",
+  "snapshot_id": "a352aec2-5074-4a8c-be83-ae25fd4c3d0c",
+  "query_id": "b36715fa-2876-4c32-9e14-a1d33e72ff84",
+  "proof_id": "4d519334-bbf1-4f3b-93e7-7122e9e5e77f",
+  "metrics": {
+    "dataset_generation_us": 299,
+    "ingestion_us": 7411,
+    "snapshot_creation_us": 6093,
+    "snapshot_activation_us": 70,
+    "query_planning_us": 1235,
+    "proof_generation_us": 5707,
+    "verification_us": 4,
+    "total_us": 20826,
+    "proof_size_bytes": 32,
+    "verification_key_size_bytes": 32,
+    "row_count": 500,
+    "chunk_count": 2,
+    "quality": {
+      "proof_generation_time": "placeholder",
+      "verification_time": "placeholder",
+      "proof_size": "placeholder",
+      "vk_size": "placeholder",
+      "overall": "placeholder"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773656496977,
+  "finished_at_ms": 1773656496998
+}

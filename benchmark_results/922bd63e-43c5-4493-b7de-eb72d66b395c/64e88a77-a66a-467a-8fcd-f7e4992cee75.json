@@ -1,0 +1,48 @@
+{
+  "run_id": "64e88a77-a66a-467a-8fcd-f7e4992cee75",
+  "scenario": {
+    "name": "emp_group_by_office_count",
+    "description": "GROUP BY office, COUNT — 6 groups, employees dataset",
+    "sql": "SELECT office, COUNT(*) FROM benchmark_employees GROUP BY office",
+    "row_count": 500,
+    "chunk_size": 256,
+    "backend": "mock",
+    "tags": [
+      "group_by",
+      "count",
+      "employees"
+    ],
+    "query_family": "group_by",
+    "operator_family": "group_by_aggregate",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "4431238d-35b9-44d9-a0c3-14bfa8f2e6ad",
+  "snapshot_id": "f212a556-c8a6-414e-9565-0cabd651cf9a",
+  "query_id": "6026ae00-7a7d-4020-9ae8-d5a1c4f4ab72",
+  "proof_id": "9a0be04e-bf6d-4f04-84dc-b619c2f97574",
+  "metrics": {
+    "dataset_generation_us": 88,
+    "ingestion_us": 2328,
+    "snapshot_creation_us": 2664,
+    "snapshot_activation_us": 13,
+    "query_planning_us": 106,
+    "proof_generation_us": 2406,
+    "verification_us": 1,
+    "total_us": 7613,
+    "proof_size_bytes": 32,
+    "verification_key_size_bytes": 32,
+    "row_count": 500,
+    "chunk_count": 2,
+    "quality": {
+      "proof_generation_time": "placeholder",
+      "verification_time": "placeholder",
+      "proof_size": "placeholder",
+      "vk_size": "placeholder",
+      "overall": "placeholder"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773656509061,
+  "finished_at_ms": 1773656509069
+}

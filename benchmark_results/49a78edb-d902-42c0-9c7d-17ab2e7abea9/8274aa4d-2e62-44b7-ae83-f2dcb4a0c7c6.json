@@ -1,0 +1,47 @@
+{
+  "run_id": "8274aa4d-2e62-44b7-ae83-f2dcb4a0c7c6",
+  "scenario": {
+    "name": "multi_aggregate",
+    "description": "Multiple aggregation functions in one query",
+    "sql": "SELECT COUNT(*), SUM(amount), AVG(score) FROM benchmark_transactions",
+    "row_count": 500,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "aggregate",
+      "multi"
+    ],
+    "query_family": "aggregate",
+    "operator_family": "aggregate",
+    "complexity_class": "moderate"
+  },
+  "dataset_id": "e5194f16-4326-434b-80b5-f8c10ccf7041",
+  "snapshot_id": "da532301-00d4-4f15-b822-717f95a1477e",
+  "query_id": "7d55648f-7f26-4d00-8215-cf1dae9af2b7",
+  "proof_id": "1c69b8cb-81b0-4cc3-adfa-10547f5e9972",
+  "metrics": {
+    "dataset_generation_us": 102,
+    "ingestion_us": 2699,
+    "snapshot_creation_us": 2993,
+    "snapshot_activation_us": 14,
+    "query_planning_us": 150,
+    "proof_generation_us": 2339,
+    "verification_us": 34,
+    "total_us": 8337,
+    "proof_size_bytes": 721,
+    "verification_key_size_bytes": 140,
+    "row_count": 500,
+    "chunk_count": 2,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773656504261,
+  "finished_at_ms": 1773656504269
+}

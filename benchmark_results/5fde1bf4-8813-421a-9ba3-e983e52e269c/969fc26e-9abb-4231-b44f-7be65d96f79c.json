@@ -1,0 +1,49 @@
+{
+  "run_id": "969fc26e-9abb-4231-b44f-7be65d96f79c",
+  "scenario": {
+    "name": "emp_self_join_manager",
+    "description": "Self-join on manager_id = employee_id — equi-join baseline",
+    "sql": "SELECT e.employee_id, e.salary, m.salary FROM benchmark_employees e JOIN benchmark_employees m ON e.manager_id = m.employee_id",
+    "row_count": 1000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "join",
+      "equi_join",
+      "self_join",
+      "employees"
+    ],
+    "query_family": "join",
+    "operator_family": "join",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "37827ef5-1b89-4c99-8cf5-18caa7a8d1c0",
+  "snapshot_id": "3a1182ac-217e-4c1e-8b4c-c2c3f80f86d2",
+  "query_id": "f5b677ba-712c-4a06-8d0d-41c3e602d01b",
+  "proof_id": "b28fdcd4-866e-4270-8977-2d9780a629ec",
+  "metrics": {
+    "dataset_generation_us": 174,
+    "ingestion_us": 4705,
+    "snapshot_creation_us": 5258,
+    "snapshot_activation_us": 15,
+    "query_planning_us": 172,
+    "proof_generation_us": 4233,
+    "verification_us": 30,
+    "total_us": 14592,
+    "proof_size_bytes": 730,
+    "verification_key_size_bytes": 140,
+    "row_count": 1000,
+    "chunk_count": 4,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670557461,
+  "finished_at_ms": 1773670557475
+}

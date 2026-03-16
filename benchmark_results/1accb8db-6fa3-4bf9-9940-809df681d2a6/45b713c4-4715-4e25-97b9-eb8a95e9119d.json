@@ -1,0 +1,48 @@
+{
+  "run_id": "45b713c4-4715-4e25-97b9-eb8a95e9119d",
+  "scenario": {
+    "name": "emp_group_by_department_sum_salary",
+    "description": "GROUP BY department, SUM(salary) — running-sum per group",
+    "sql": "SELECT department, SUM(salary) FROM benchmark_employees GROUP BY department",
+    "row_count": 1000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "group_by",
+      "sum",
+      "employees"
+    ],
+    "query_family": "group_by",
+    "operator_family": "group_by_aggregate",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "06f1b1fe-e685-4063-862e-1501d7232ef4",
+  "snapshot_id": "a6d21101-593b-4469-924d-777eb06e5597",
+  "query_id": "4bb8fed5-0e37-491b-977c-efb26028b829",
+  "proof_id": "30eb2cc5-e728-4ffd-8d0f-557730aa149b",
+  "metrics": {
+    "dataset_generation_us": 213,
+    "ingestion_us": 5655,
+    "snapshot_creation_us": 5941,
+    "snapshot_activation_us": 21,
+    "query_planning_us": 220,
+    "proof_generation_us": 4367,
+    "verification_us": 43,
+    "total_us": 16465,
+    "proof_size_bytes": 721,
+    "verification_key_size_bytes": 140,
+    "row_count": 1000,
+    "chunk_count": 4,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670563389,
+  "finished_at_ms": 1773670563406
+}

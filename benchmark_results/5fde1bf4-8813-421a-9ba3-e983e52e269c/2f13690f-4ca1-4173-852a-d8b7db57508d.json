@@ -1,0 +1,48 @@
+{
+  "run_id": "2f13690f-4ca1-4173-852a-d8b7db57508d",
+  "scenario": {
+    "name": "avg_aggregation",
+    "description": "Filtered AVG on score column",
+    "sql": "SELECT AVG(score) FROM benchmark_transactions WHERE category = 'electronics'",
+    "row_count": 1000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "filter",
+      "aggregate",
+      "avg"
+    ],
+    "query_family": "aggregate",
+    "operator_family": "filter_aggregate",
+    "complexity_class": "moderate"
+  },
+  "dataset_id": "100e6baf-5da1-4d2a-9ac6-a8afb8a25ca4",
+  "snapshot_id": "2a22ab4a-039c-45fb-a213-6a4853058970",
+  "query_id": "7871fb83-9e7f-460c-a187-b44e5a7ea3a8",
+  "proof_id": "505923ca-67ee-4659-976b-c59f606adf5f",
+  "metrics": {
+    "dataset_generation_us": 183,
+    "ingestion_us": 4871,
+    "snapshot_creation_us": 5280,
+    "snapshot_activation_us": 17,
+    "query_planning_us": 146,
+    "proof_generation_us": 4212,
+    "verification_us": 38,
+    "total_us": 14753,
+    "proof_size_bytes": 728,
+    "verification_key_size_bytes": 140,
+    "row_count": 1000,
+    "chunk_count": 4,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670557239,
+  "finished_at_ms": 1773670557253
+}

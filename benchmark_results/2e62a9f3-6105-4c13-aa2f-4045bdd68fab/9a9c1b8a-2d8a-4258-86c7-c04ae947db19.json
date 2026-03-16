@@ -1,0 +1,47 @@
+{
+  "run_id": "9a9c1b8a-2d8a-4258-86c7-c04ae947db19",
+  "scenario": {
+    "name": "range_filter",
+    "description": "Compound range filter on two numeric columns",
+    "sql": "SELECT id, user_id, score FROM benchmark_transactions WHERE score > 500 AND amount < 30000",
+    "row_count": 2000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "filter",
+      "range"
+    ],
+    "query_family": "filter",
+    "operator_family": "filter_project",
+    "complexity_class": "linear"
+  },
+  "dataset_id": "e9775cdc-fe9a-43c9-9b0a-a199105925e1",
+  "snapshot_id": "5d5b2b51-3750-4187-9950-84fc9c9394b5",
+  "query_id": "5fee4b82-3c2c-44c8-bd12-e83c296ecad8",
+  "proof_id": "1488207f-994c-43b0-b229-19b9112785ea",
+  "metrics": {
+    "dataset_generation_us": 371,
+    "ingestion_us": 10088,
+    "snapshot_creation_us": 10930,
+    "snapshot_activation_us": 19,
+    "query_planning_us": 199,
+    "proof_generation_us": 8454,
+    "verification_us": 41,
+    "total_us": 30109,
+    "proof_size_bytes": 725,
+    "verification_key_size_bytes": 140,
+    "row_count": 2000,
+    "chunk_count": 8,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670570097,
+  "finished_at_ms": 1773670570127
+}

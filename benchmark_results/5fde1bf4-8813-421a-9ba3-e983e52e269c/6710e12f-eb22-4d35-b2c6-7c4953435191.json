@@ -1,0 +1,48 @@
+{
+  "run_id": "6710e12f-eb22-4d35-b2c6-7c4953435191",
+  "scenario": {
+    "name": "emp_sort_salary_desc",
+    "description": "Sort employees by salary descending",
+    "sql": "SELECT employee_id, salary FROM benchmark_employees ORDER BY salary DESC",
+    "row_count": 1000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "sort",
+      "desc",
+      "employees"
+    ],
+    "query_family": "sort",
+    "operator_family": "sort",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "6cc80cb4-8ebd-4a84-b2b5-587b5da74023",
+  "snapshot_id": "2d22ebc2-04ac-4b70-aa08-40e12d59e19f",
+  "query_id": "18c46380-4bef-4575-ab38-b63dbbca9d18",
+  "proof_id": "5c28a851-347e-4a01-9aa5-92c18e79dbc9",
+  "metrics": {
+    "dataset_generation_us": 181,
+    "ingestion_us": 4769,
+    "snapshot_creation_us": 5253,
+    "snapshot_activation_us": 15,
+    "query_planning_us": 100,
+    "proof_generation_us": 4780,
+    "verification_us": 32,
+    "total_us": 15135,
+    "proof_size_bytes": 707,
+    "verification_key_size_bytes": 134,
+    "row_count": 1000,
+    "chunk_count": 4,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670557386,
+  "finished_at_ms": 1773670557401
+}

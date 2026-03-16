@@ -1,0 +1,48 @@
+{
+  "run_id": "78d4d98e-c477-457b-aa21-76df234b76a0",
+  "scenario": {
+    "name": "txn_group_by_category_count",
+    "description": "GROUP BY category, COUNT — 8 groups, transactions dataset",
+    "sql": "SELECT category, COUNT(*) FROM benchmark_transactions GROUP BY category",
+    "row_count": 500,
+    "chunk_size": 256,
+    "backend": "mock",
+    "tags": [
+      "group_by",
+      "count",
+      "transactions"
+    ],
+    "query_family": "group_by",
+    "operator_family": "group_by_aggregate",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "f6713010-658b-44d1-ac12-0aa5d3af4f31",
+  "snapshot_id": "c67bce31-4cd5-4561-852c-865739e5caa2",
+  "query_id": "9ef93499-145e-4bca-b0fa-214574a2107f",
+  "proof_id": "2a4dbb49-0393-4eaa-a3d3-f39bd6922f45",
+  "metrics": {
+    "dataset_generation_us": 88,
+    "ingestion_us": 2332,
+    "snapshot_creation_us": 2607,
+    "snapshot_activation_us": 12,
+    "query_planning_us": 86,
+    "proof_generation_us": 2455,
+    "verification_us": 1,
+    "total_us": 7586,
+    "proof_size_bytes": 32,
+    "verification_key_size_bytes": 32,
+    "row_count": 500,
+    "chunk_count": 2,
+    "quality": {
+      "proof_generation_time": "placeholder",
+      "verification_time": "placeholder",
+      "proof_size": "placeholder",
+      "vk_size": "placeholder",
+      "overall": "placeholder"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773656509077,
+  "finished_at_ms": 1773656509084
+}

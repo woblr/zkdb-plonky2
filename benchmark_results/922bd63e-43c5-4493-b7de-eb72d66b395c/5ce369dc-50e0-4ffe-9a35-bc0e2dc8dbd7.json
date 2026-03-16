@@ -1,0 +1,48 @@
+{
+  "run_id": "5ce369dc-50e0-4ffe-9a35-bc0e2dc8dbd7",
+  "scenario": {
+    "name": "filter_sum",
+    "description": "Filter by region + aggregate SUM",
+    "sql": "SELECT SUM(amount) FROM benchmark_transactions WHERE region = 'us-east'",
+    "row_count": 500,
+    "chunk_size": 256,
+    "backend": "mock",
+    "tags": [
+      "filter",
+      "aggregate",
+      "sum"
+    ],
+    "query_family": "aggregate",
+    "operator_family": "filter_aggregate",
+    "complexity_class": "moderate"
+  },
+  "dataset_id": "ac69cef4-e34f-4d49-adab-05af0b30ee53",
+  "snapshot_id": "c89ed1e4-55c3-4f13-baae-309962946807",
+  "query_id": "88340397-7953-4d73-ac2a-969b58d7ede5",
+  "proof_id": "18f247ce-efd8-4d29-b66e-959046c0a806",
+  "metrics": {
+    "dataset_generation_us": 188,
+    "ingestion_us": 4993,
+    "snapshot_creation_us": 4871,
+    "snapshot_activation_us": 21,
+    "query_planning_us": 230,
+    "proof_generation_us": 4471,
+    "verification_us": 3,
+    "total_us": 14782,
+    "proof_size_bytes": 32,
+    "verification_key_size_bytes": 32,
+    "row_count": 500,
+    "chunk_count": 2,
+    "quality": {
+      "proof_generation_time": "placeholder",
+      "verification_time": "placeholder",
+      "proof_size": "placeholder",
+      "vk_size": "placeholder",
+      "overall": "placeholder"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773656508965,
+  "finished_at_ms": 1773656508980
+}

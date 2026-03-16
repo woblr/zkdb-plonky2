@@ -1,0 +1,48 @@
+{
+  "run_id": "c8d49903-059a-4bef-aacb-38adb5e07ed0",
+  "scenario": {
+    "name": "txn_join_region_filter",
+    "description": "Transaction equi-join on user_id with amount filter",
+    "sql": "SELECT t.id, t.amount, t.region FROM benchmark_transactions t JOIN benchmark_transactions t2 ON t.user_id = t2.user_id WHERE t.amount > 50000",
+    "row_count": 1000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "join",
+      "filter",
+      "transactions"
+    ],
+    "query_family": "join",
+    "operator_family": "join",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "41505b52-a291-4635-97e5-55f2a477a39c",
+  "snapshot_id": "5b8a4715-cda9-43fd-9f1f-d451897a3013",
+  "query_id": "fdca4226-c788-466a-b2cb-1e048148c880",
+  "proof_id": "53d6065d-2e3d-427b-9066-662cb06df5a9",
+  "metrics": {
+    "dataset_generation_us": 181,
+    "ingestion_us": 6209,
+    "snapshot_creation_us": 6343,
+    "snapshot_activation_us": 33,
+    "query_planning_us": 254,
+    "proof_generation_us": 4431,
+    "verification_us": 45,
+    "total_us": 17503,
+    "proof_size_bytes": 729,
+    "verification_key_size_bytes": 140,
+    "row_count": 1000,
+    "chunk_count": 4,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670563606,
+  "finished_at_ms": 1773670563623
+}

@@ -1,0 +1,48 @@
+{
+  "run_id": "997f0ce1-9ee8-4830-8712-40e53b8f8483",
+  "scenario": {
+    "name": "txn_group_by_region_sum",
+    "description": "GROUP BY region, SUM(amount) — 6 groups, transactions dataset",
+    "sql": "SELECT region, SUM(amount) FROM benchmark_transactions GROUP BY region",
+    "row_count": 500,
+    "chunk_size": 256,
+    "backend": "mock",
+    "tags": [
+      "group_by",
+      "sum",
+      "transactions"
+    ],
+    "query_family": "group_by",
+    "operator_family": "group_by_aggregate",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "53334d01-2001-4fb8-bfd5-bf7bba8e14cb",
+  "snapshot_id": "9d7dc190-61ae-447b-9774-f4017000dc6d",
+  "query_id": "afc552b4-e3c6-485a-b46d-f68a0631c1bd",
+  "proof_id": "a247a962-1f6e-4f78-af5f-aecfa5477cbb",
+  "metrics": {
+    "dataset_generation_us": 90,
+    "ingestion_us": 2342,
+    "snapshot_creation_us": 2599,
+    "snapshot_activation_us": 12,
+    "query_planning_us": 100,
+    "proof_generation_us": 2409,
+    "verification_us": 1,
+    "total_us": 7558,
+    "proof_size_bytes": 32,
+    "verification_key_size_bytes": 32,
+    "row_count": 500,
+    "chunk_count": 2,
+    "quality": {
+      "proof_generation_time": "placeholder",
+      "verification_time": "placeholder",
+      "proof_size": "placeholder",
+      "vk_size": "placeholder",
+      "overall": "placeholder"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773656509069,
+  "finished_at_ms": 1773656509077
+}

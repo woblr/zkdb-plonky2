@@ -1,0 +1,48 @@
+{
+  "run_id": "f4f8c2dc-b7ed-4d0e-8764-f674678ca927",
+  "scenario": {
+    "name": "txn_sort_score_desc",
+    "description": "Sort transactions by score descending",
+    "sql": "SELECT id, user_id, score FROM benchmark_transactions ORDER BY score DESC",
+    "row_count": 1000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "sort",
+      "desc",
+      "transactions"
+    ],
+    "query_family": "sort",
+    "operator_family": "sort",
+    "complexity_class": "heavy"
+  },
+  "dataset_id": "7d117201-316b-411c-aa44-56ba6e597850",
+  "snapshot_id": "1b08302d-0717-4460-9b3f-020a4429ef65",
+  "query_id": "306f2e64-bdb7-430d-b0be-026dfaf523ed",
+  "proof_id": "c39992b7-bb4c-4900-8562-b3b722db4b28",
+  "metrics": {
+    "dataset_generation_us": 312,
+    "ingestion_us": 7031,
+    "snapshot_creation_us": 6435,
+    "snapshot_activation_us": 121,
+    "query_planning_us": 320,
+    "proof_generation_us": 5086,
+    "verification_us": 41,
+    "total_us": 19353,
+    "proof_size_bytes": 720,
+    "verification_key_size_bytes": 134,
+    "row_count": 1000,
+    "chunk_count": 4,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670563569,
+  "finished_at_ms": 1773670563588
+}

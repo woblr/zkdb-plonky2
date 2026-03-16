@@ -1,0 +1,49 @@
+{
+  "run_id": "396b3b2f-0f9f-4e0b-83d1-c0cb4a358b83",
+  "scenario": {
+    "name": "emp_top10_salary",
+    "description": "Top-10 employees by salary — sort + limit",
+    "sql": "SELECT employee_id, salary FROM benchmark_employees ORDER BY salary DESC LIMIT 10",
+    "row_count": 500,
+    "chunk_size": 256,
+    "backend": "mock",
+    "tags": [
+      "sort",
+      "top_k",
+      "limit",
+      "employees"
+    ],
+    "query_family": "sort",
+    "operator_family": "sort",
+    "complexity_class": "moderate"
+  },
+  "dataset_id": "bbbe4c4d-6258-4792-b873-0f543ac2a234",
+  "snapshot_id": "249be69a-5ffb-4e74-92d6-dd1813eb0e1f",
+  "query_id": "beb1df95-0479-4b44-a940-4bb86a4344e7",
+  "proof_id": "b83ab267-ef4c-4565-9abd-f78959140d5b",
+  "metrics": {
+    "dataset_generation_us": 88,
+    "ingestion_us": 2329,
+    "snapshot_creation_us": 2628,
+    "snapshot_activation_us": 14,
+    "query_planning_us": 113,
+    "proof_generation_us": 2410,
+    "verification_us": 1,
+    "total_us": 7588,
+    "proof_size_bytes": 32,
+    "verification_key_size_bytes": 32,
+    "row_count": 500,
+    "chunk_count": 2,
+    "quality": {
+      "proof_generation_time": "placeholder",
+      "verification_time": "placeholder",
+      "proof_size": "placeholder",
+      "vk_size": "placeholder",
+      "overall": "placeholder"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773656509100,
+  "finished_at_ms": 1773656509108
+}

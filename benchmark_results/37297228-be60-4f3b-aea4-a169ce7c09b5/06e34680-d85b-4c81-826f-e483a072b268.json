@@ -1,0 +1,47 @@
+{
+  "run_id": "06e34680-d85b-4c81-826f-e483a072b268",
+  "scenario": {
+    "name": "select_star_limit",
+    "description": "Full scan with LIMIT",
+    "sql": "SELECT * FROM benchmark_transactions LIMIT 100",
+    "row_count": 1000,
+    "chunk_size": 256,
+    "backend": "constraint_checked",
+    "tags": [
+      "scan",
+      "limit"
+    ],
+    "query_family": "scan",
+    "operator_family": "limit",
+    "complexity_class": "linear"
+  },
+  "dataset_id": "5327ec7e-c8a5-471d-b7b3-30a8fa8c0cf3",
+  "snapshot_id": "8ce94834-ec0d-4d22-a2ae-9d28d04d6de4",
+  "query_id": "e5eeeffb-2198-4f43-8083-678889712123",
+  "proof_id": "85769a0f-67b2-4de1-b8a1-dfb2fffadfc2",
+  "metrics": {
+    "dataset_generation_us": 174,
+    "ingestion_us": 4824,
+    "snapshot_creation_us": 5648,
+    "snapshot_activation_us": 20,
+    "query_planning_us": 112,
+    "proof_generation_us": 4572,
+    "verification_us": 46,
+    "total_us": 15403,
+    "proof_size_bytes": 720,
+    "verification_key_size_bytes": 140,
+    "row_count": 1000,
+    "chunk_count": 4,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773670552236,
+  "finished_at_ms": 1773670552251
+}
