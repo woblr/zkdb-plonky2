@@ -13,6 +13,9 @@ name = "zkdb_plonky2"
 path = "src/lib.rs"
 
 [dependencies]
+# Plonky2 FRI-based SNARK
+plonky2 = { version = "0.2.2", default-features = false, features = ["std", "parallel"] }
+
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 

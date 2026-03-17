@@ -1,0 +1,47 @@
+{
+  "run_id": "8a3fb1d8-b98e-4244-869e-da1aba49c5d3",
+  "scenario": {
+    "name": "count_all",
+    "description": "Full table COUNT aggregation",
+    "sql": "SELECT COUNT(*) FROM benchmark_transactions",
+    "row_count": 5000,
+    "chunk_size": 1024,
+    "backend": "plonky2",
+    "tags": [
+      "aggregate",
+      "count"
+    ],
+    "query_family": "aggregate",
+    "operator_family": "aggregate",
+    "complexity_class": "linear"
+  },
+  "dataset_id": "5e5d05a1-80b6-4483-b2a3-fb7c94afb91a",
+  "snapshot_id": "2c53da7d-90b4-416c-baab-46e3fe925522",
+  "query_id": "4e4be2c1-8778-4e22-a629-5d693860ad5d",
+  "proof_id": "e66122a7-52ea-4ae4-bef0-ab16addcf991",
+  "metrics": {
+    "dataset_generation_us": 507,
+    "ingestion_us": 3031,
+    "snapshot_creation_us": 1913,
+    "snapshot_activation_us": 4,
+    "query_planning_us": 77,
+    "proof_generation_us": 30390,
+    "verification_us": 2604,
+    "total_us": 38533,
+    "proof_size_bytes": 89516,
+    "verification_key_size_bytes": 552,
+    "row_count": 5000,
+    "chunk_count": 5,
+    "quality": {
+      "proof_generation_time": "real",
+      "verification_time": "real",
+      "proof_size": "real",
+      "vk_size": "real",
+      "overall": "real"
+    }
+  },
+  "success": true,
+  "error": null,
+  "started_at_ms": 1773673351076,
+  "finished_at_ms": 1773673351115
+}

@@ -438,26 +438,42 @@ async fn valid_witness_proves_and_verifies() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 14. Plonky2 stub prove() returns error, NOT a success
+// 14. Plonky2 backend proves successfully AND produces a real FRI proof
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
-async fn plonky2_stub_prove_always_errors() {
+async fn plonky2_backend_proves_real_snark() {
     use zkdb_plonky2::backend::Plonky2Backend;
+    use zkdb_plonky2::proof::artifacts::ProofSystemKind;
 
-    let b = Plonky2Backend::new_stub();
-    let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+    let b = Plonky2Backend::new();
+    let plan = make_plan(ProofOperator::PartialAggregate {
+        group_by_json: "[]".into(),
+        aggregates_json: r#"[{"kind":"count","column":"*"}]"#.into(),
+    });
     let circuit = b.compile_circuit(&plan).await.unwrap();
-    let witness = WitnessTrace::new(QueryId::new(), SnapshotId::new());
+
+    let mut witness = WitnessTrace::new(QueryId::new(), SnapshotId::new());
+    witness.result_row_count = 5;
+    witness.selected = vec![true; 5];
 
     let result = b.prove(circuit.as_ref(), &witness).await;
-    assert!(result.is_err(), "Plonky2 stub prove must always return Err");
+    assert!(result.is_ok(), "Plonky2 real backend must prove successfully: {:?}", result.err());
 
-    let msg = format!("{}", result.unwrap_err());
+    let artifact = result.unwrap();
+    assert!(!artifact.proof_bytes.is_empty(), "proof bytes must be non-empty");
     assert!(
-        msg.contains("not yet wired"),
-        "Plonky2 stub error must say 'not yet wired': {}", msg
+        artifact.proof_bytes.len() > 1000,
+        "Plonky2 FRI proof must exceed 1 KB, got {} bytes", artifact.proof_bytes.len()
     );
+    assert_eq!(
+        artifact.proof_system, ProofSystemKind::Plonky2Snark,
+        "proof system label must be Plonky2Snark"
+    );
+
+    // Verify the proof
+    let verification = b.verify(&artifact).await.unwrap();
+    assert!(verification.is_valid, "real Plonky2 proof must verify successfully");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
