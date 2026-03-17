@@ -1,8 +1,26 @@
-//! Witness trace types.
+//! Witness trace types and builder.
 //!
 //! A witness trace holds the concrete values that will be assigned to
 //! circuit wires during proving. It is generated from chunk data before
 //! the circuit is built.
+//!
+//! ## Phase-3 changes
+//!
+//! `WitnessBuilder::build` now produces a **Poseidon-bound** witness:
+//!
+//! - `columns[0]` holds the *primary field element* of each row (first 8 bytes
+//!   of `row_bytes` as a little-endian u64), **not** a Blake3 hash.
+//! - `snapshot_root` is set to `poseidon_snapshot_root(all_row_bytes)` so it
+//!   matches the `PI[0]` that the circuit constrains.  The old Blake3 root that
+//!   came from the proof plan is **not** used — circuits prove against the
+//!   Poseidon root, not against the Blake3 Merkle root.
+//!
+//! TODO (schema-aware decoding):
+//!   A full implementation would take the `DatasetSchema` as a parameter and
+//!   decode each `row_bytes` slice column-by-column according to `ColumnType`.
+//!   The current approach packs the first 8 raw bytes of each row.  For
+//!   datasets where the primary numeric column occupies bytes 0–7 this is
+//!   exact; for other layouts it is an approximation.
 
 use crate::field::FieldElement;
 use crate::types::{QueryId, SnapshotId};
@@ -50,6 +68,10 @@ pub struct WitnessTrace {
     pub query_id: QueryId,
     pub snapshot_id: SnapshotId,
     /// Public inputs committed to in the proof.
+    ///
+    /// **Phase 3**: `snapshot_root` now holds the *Poseidon-based* commitment
+    /// to the row data (first 8 bytes = `snap_lo` used as `PI[0]`).
+    /// The Blake3 Merkle root is kept separately in the snapshot manifest.
     pub snapshot_root: [u8; 32],
     pub query_hash: [u8; 32],
     pub result_commitment: [u8; 32],
@@ -60,7 +82,8 @@ pub struct WitnessTrace {
     ///
     /// Populated by `WitnessBuilder` for operators that reorder rows (Sort,
     /// GroupBy). When non-empty, `SortCircuit` uses these to verify that the
-    /// output `columns` are a valid permutation of the input (multiset equality).
+    /// output `columns` are a valid permutation of the input (multiset equality
+    /// via grand-product check in Phase 3).
     /// Empty for operators where input == output order (Scan, Filter, etc.).
     pub input_columns: Vec<ColumnTrace>,
     /// Selected row bitmap (true = row passes predicate / is included).
@@ -110,6 +133,9 @@ impl WitnessTrace {
 // WitnessBuilder
 // ─────────────────────────────────────────────────────────────────────────────
 
+use crate::commitment::poseidon::{
+    poseidon_snapshot_root, row_primary_field_element,
+};
 use crate::database::storage::StagedChunk;
 use crate::proof::artifacts::PublicInputs;
 use crate::query::proof_plan::{ProofOperator, ProofPlan};
@@ -117,11 +143,16 @@ use crate::types::ZkResult;
 
 /// Builds a `WitnessTrace` from chunk data and a proof plan.
 ///
-/// The witness is shaped to match what the root operator's circuit expects:
-/// - For Sort operators: column values are sorted ascending so the circuit
-///   constraint (output must be sorted) is satisfied.
-/// - For GroupBy operators: column values are sorted by key (group-sort precondition).
-/// - For all other operators: values are in chunk order (natural row order).
+/// ## Phase-3 semantics
+///
+/// - Row values are the *primary field element* of each row (first 8 raw bytes
+///   as LE u64).  This is used for **both** column data and Poseidon binding.
+/// - `snapshot_root` = `poseidon_snapshot_root(all_row_bytes)`.  The first 8
+///   bytes of this value equal `snap_lo` = `Poseidon(padded_primary_fes)[0]`,
+///   which the circuit constrains via `b.connect(hash_out.elements[0], PI[0])`.
+/// - For Sort/GroupBy operators, the column is sorted **after** the primary
+///   field elements are collected; the original order is kept in
+///   `input_columns[0]` for the grand-product permutation check.
 pub struct WitnessBuilder;
 
 impl WitnessBuilder {
@@ -133,57 +164,93 @@ impl WitnessBuilder {
     ) -> ZkResult<WitnessTrace> {
         let mut trace = WitnessTrace::new(query_id, snapshot_id);
 
-        // Set public inputs from plan
-        trace.snapshot_root = *proof_plan.snapshot_root.as_bytes();
-        trace.query_hash = PublicInputs::compute_query_hash(&proof_plan.query_id.to_string());
+        // Set query_hash from plan
+        trace.query_hash =
+            PublicInputs::compute_query_hash(&proof_plan.query_id.to_string());
 
-        // Build per-chunk column traces from raw bytes:
-        // one column "row_bytes" with Blake3 hash of each row's bytes (u64 representation).
-        let mut all_row_hashes: Vec<FieldElement> = Vec::new();
-        let mut all_selected: Vec<bool> = Vec::new();
-        let mut total_rows: u64 = 0;
-
+        // ── Step 1: collect all row bytes across all chunks ──────────────────
+        let mut all_row_bytes: Vec<Vec<u8>> = Vec::new();
         for chunk in chunks {
             for row_bytes in &chunk.row_bytes {
-                let hash_bytes = *blake3::hash(row_bytes).as_bytes();
-                // Pack first 8 bytes into a field element
-                let fe_bytes: [u8; 8] = hash_bytes[..8].try_into().unwrap_or([0u8; 8]);
-                all_row_hashes.push(FieldElement::from_canonical_bytes(fe_bytes));
-                all_selected.push(true);
-                total_rows += 1;
+                all_row_bytes.push(row_bytes.clone());
             }
         }
 
-        // Inspect the root operator to determine if the witness column
-        // needs to be pre-processed to satisfy circuit constraints.
+        // ── Step 2: extract primary field element for each row ───────────────
+        //
+        // Phase-3 uses the first 8 bytes of each row's canonical bytes as a
+        // Goldilocks field element.  This represents the leading (typically
+        // numeric) column.
+        //
+        // TODO: schema-aware decoding — accept a `DatasetSchema` parameter and
+        // decode each column according to `ColumnType::fixed_byte_width()`.
+        let all_primary_fes: Vec<u64> = all_row_bytes
+            .iter()
+            .map(|rb| row_primary_field_element(rb))
+            .collect();
+
+        let total_rows = all_primary_fes.len() as u64;
+
+        // ── Step 3: compute Poseidon snapshot root ───────────────────────────
+        //
+        // This is what PI[0] (snap_lo) in the circuit is constrained to equal.
+        // It is derived purely from the row data, not from the Blake3 Merkle
+        // root in proof_plan.snapshot_root.
+        trace.snapshot_root = poseidon_snapshot_root(&all_row_bytes);
+
+        // ── Step 4: shape per-operator columns ───────────────────────────────
         let root_op = Self::root_operator(proof_plan);
         match root_op {
             ProofOperator::Sort { .. } => {
-                // SortCircuit requires output column to be sorted (ascending or descending).
-                // Save pre-sort values as input_columns so SortCircuit can verify
-                // multiset equality (output is a valid permutation of input).
-                let pre_sort = all_row_hashes.clone();
-                all_row_hashes.sort_by_key(|fe| fe.0);
-                trace.input_columns = vec![ColumnTrace::new("__row_hash_input", pre_sort)];
+                // SortCircuit requires:
+                //   - input_columns[0]  = pre-sort primary field elements
+                //   - columns[0]        = post-sort (ascending)
+                //
+                // Grand-product check in circuit verifies that sorted output
+                // is a permutation of the unsorted input.
+                let pre_sort: Vec<FieldElement> =
+                    all_primary_fes.iter().map(|&v| FieldElement(v)).collect();
+                let mut sorted_vals = all_primary_fes.clone();
+                sorted_vals.sort_unstable();
+                let post_sort: Vec<FieldElement> =
+                    sorted_vals.iter().map(|&v| FieldElement(v)).collect();
+
+                trace.input_columns =
+                    vec![ColumnTrace::new("__primary_in", pre_sort)];
+                trace.columns = vec![ColumnTrace::new("__primary_out", post_sort)];
             }
-            ProofOperator::PartialAggregate { .. } | ProofOperator::MergeAggregate { .. } => {
-                // GroupByCircuit requires key column to be sorted.
-                // Save pre-sort values as input_columns for multiset verification.
-                let pre_sort = all_row_hashes.clone();
-                all_row_hashes.sort_by_key(|fe| fe.0);
-                trace.input_columns = vec![ColumnTrace::new("__row_hash_input", pre_sort)];
+
+            ProofOperator::PartialAggregate { .. }
+            | ProofOperator::MergeAggregate { .. } => {
+                // For GroupBy: sort keys for the circuit; keep original for
+                // grand-product permutation check.
+                let pre_sort: Vec<FieldElement> =
+                    all_primary_fes.iter().map(|&v| FieldElement(v)).collect();
+                let mut sorted_vals = all_primary_fes.clone();
+                sorted_vals.sort_unstable();
+                let post_sort: Vec<FieldElement> =
+                    sorted_vals.iter().map(|&v| FieldElement(v)).collect();
+
+                trace.input_columns =
+                    vec![ColumnTrace::new("__primary_in", pre_sort)];
+                trace.columns = vec![ColumnTrace::new("__primary_out", post_sort)];
             }
+
             _ => {
-                // Other operators (Scan, Filter, Projection, etc.) have no ordering requirement.
-                // input_columns stays empty — no reordering happened.
+                // Scan, Filter, Projection, Limit, HashJoin, RecursiveFold:
+                // no reordering needed.
+                let fes: Vec<FieldElement> =
+                    all_primary_fes.iter().map(|&v| FieldElement(v)).collect();
+                trace.columns = vec![ColumnTrace::new("__primary", fes)];
             }
         }
 
-        trace.columns = vec![ColumnTrace::new("__row_hash", all_row_hashes)];
-        trace.selected = all_selected;
+        trace.selected = vec![true; all_row_bytes.len()];
         trace.result_row_count = total_rows;
 
-        // Compute result_commitment = Blake3 of all selected row hashes (in order)
+        // ── Step 5: result_commitment ─────────────────────────────────────────
+        //
+        // Commit to (snapshot_root, query_hash, selected primary field elements).
         let selected_bytes: Vec<u8> = trace
             .columns
             .iter()

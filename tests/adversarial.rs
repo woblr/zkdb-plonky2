@@ -23,7 +23,7 @@
 use zkdb_plonky2::{
     backend::{ConstraintCheckedBackend, ProvingBackend},
     circuit::witness::{ColumnTrace, WitnessTrace},
-    commitment::root::CommitmentRoot,
+    commitment::{poseidon::compute_snap_lo, root::CommitmentRoot},
     field::FieldElement,
     proof::artifacts::{ProofSystemKind},
     query::proof_plan::{
@@ -31,6 +31,8 @@ use zkdb_plonky2::{
     },
     types::{BackendTag, DatasetId, ProofId, QueryId, SnapshotId},
 };
+
+const MAX_ROWS: usize = 128;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -456,6 +458,10 @@ async fn plonky2_backend_proves_real_snark() {
     let mut witness = WitnessTrace::new(QueryId::new(), SnapshotId::new());
     witness.result_row_count = 5;
     witness.selected = vec![true; 5];
+    // AggCircuit binds PI[0] = Poseidon(values[0..MAX_ROWS]) where values come from
+    // witness.columns[0]. With no columns set, all values are zero-padded.
+    let snap_lo = compute_snap_lo(MAX_ROWS, &[]);
+    witness.snapshot_root[..8].copy_from_slice(&snap_lo.to_le_bytes());
 
     let result = b.prove(circuit.as_ref(), &witness).await;
     assert!(result.is_ok(), "Plonky2 real backend must prove successfully: {:?}", result.err());
