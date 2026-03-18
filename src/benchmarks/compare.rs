@@ -138,8 +138,10 @@ impl BenchmarkComparison {
             .unwrap_or_else(|| "unknown".to_string());
 
         // Index B by scenario name
-        let b_by_name: std::collections::HashMap<&str, &BenchmarkResult> =
-            results_b.iter().map(|r| (r.scenario.name.as_str(), r)).collect();
+        let b_by_name: std::collections::HashMap<&str, &BenchmarkResult> = results_b
+            .iter()
+            .map(|r| (r.scenario.name.as_str(), r))
+            .collect();
 
         let mut rows = Vec::new();
         for ra in results_a {
@@ -180,12 +182,30 @@ impl BenchmarkComparison {
 
         let summary = ComparisonSummary {
             total_scenarios: rows.len(),
-            a_wins_proof_gen: rows.iter().filter(|r| r.proof_generation.winner == DeltaWinner::A).count(),
-            b_wins_proof_gen: rows.iter().filter(|r| r.proof_generation.winner == DeltaWinner::B).count(),
-            a_wins_verification: rows.iter().filter(|r| r.verification.winner == DeltaWinner::A).count(),
-            b_wins_verification: rows.iter().filter(|r| r.verification.winner == DeltaWinner::B).count(),
-            a_wins_proof_size: rows.iter().filter(|r| r.proof_size.winner == DeltaWinner::A).count(),
-            b_wins_proof_size: rows.iter().filter(|r| r.proof_size.winner == DeltaWinner::B).count(),
+            a_wins_proof_gen: rows
+                .iter()
+                .filter(|r| r.proof_generation.winner == DeltaWinner::A)
+                .count(),
+            b_wins_proof_gen: rows
+                .iter()
+                .filter(|r| r.proof_generation.winner == DeltaWinner::B)
+                .count(),
+            a_wins_verification: rows
+                .iter()
+                .filter(|r| r.verification.winner == DeltaWinner::A)
+                .count(),
+            b_wins_verification: rows
+                .iter()
+                .filter(|r| r.verification.winner == DeltaWinner::B)
+                .count(),
+            a_wins_proof_size: rows
+                .iter()
+                .filter(|r| r.proof_size.winner == DeltaWinner::A)
+                .count(),
+            b_wins_proof_size: rows
+                .iter()
+                .filter(|r| r.proof_size.winner == DeltaWinner::B)
+                .count(),
         };
 
         Self {
@@ -201,30 +221,43 @@ impl BenchmarkComparison {
     /// Print a comparison table to stdout.
     pub fn print(&self) {
         println!("╔══════════════════════════════════════════════════════════════════════╗");
-        println!("║  Comparison: {} vs {}",  self.label_a, self.label_b);
+        println!("║  Comparison: {} vs {}", self.label_a, self.label_b);
         println!("║  Backends:   {} vs {}", self.backend_a, self.backend_b);
         println!("╠══════════════════════════════════════════════════════════════════════╣");
 
         for row in &self.rows {
             println!("║  Scenario: {}", row.scenario_name);
-            println!("║    Proof gen:    {:>10.0} vs {:>10.0} µs ({:+.1}%)",
-                row.proof_generation.value_a, row.proof_generation.value_b,
-                row.proof_generation.percent_change);
-            println!("║    Verification: {:>10.0} vs {:>10.0} µs ({:+.1}%)",
-                row.verification.value_a, row.verification.value_b,
-                row.verification.percent_change);
-            println!("║    Proof size:   {:>10.0} vs {:>10.0} B  ({:+.1}%)",
-                row.proof_size.value_a, row.proof_size.value_b,
-                row.proof_size.percent_change);
-            println!("║    Quality:      {} vs {}",
-                row.quality_a, row.quality_b);
+            println!(
+                "║    Proof gen:    {:>10.0} vs {:>10.0} µs ({:+.1}%)",
+                row.proof_generation.value_a,
+                row.proof_generation.value_b,
+                row.proof_generation.percent_change
+            );
+            println!(
+                "║    Verification: {:>10.0} vs {:>10.0} µs ({:+.1}%)",
+                row.verification.value_a, row.verification.value_b, row.verification.percent_change
+            );
+            println!(
+                "║    Proof size:   {:>10.0} vs {:>10.0} B  ({:+.1}%)",
+                row.proof_size.value_a, row.proof_size.value_b, row.proof_size.percent_change
+            );
+            println!("║    Quality:      {} vs {}", row.quality_a, row.quality_b);
             println!("║  ──────────────────────────────────────────────────────────────────");
         }
 
         println!("║  Summary ({} scenarios):", self.summary.total_scenarios);
-        println!("║    Proof gen wins:    A={} B={}", self.summary.a_wins_proof_gen, self.summary.b_wins_proof_gen);
-        println!("║    Verification wins: A={} B={}", self.summary.a_wins_verification, self.summary.b_wins_verification);
-        println!("║    Proof size wins:   A={} B={}", self.summary.a_wins_proof_size, self.summary.b_wins_proof_size);
+        println!(
+            "║    Proof gen wins:    A={} B={}",
+            self.summary.a_wins_proof_gen, self.summary.b_wins_proof_gen
+        );
+        println!(
+            "║    Verification wins: A={} B={}",
+            self.summary.a_wins_verification, self.summary.b_wins_verification
+        );
+        println!(
+            "║    Proof size wins:   A={} B={}",
+            self.summary.a_wins_proof_size, self.summary.b_wins_proof_size
+        );
         println!("╚══════════════════════════════════════════════════════════════════════╝");
     }
 }

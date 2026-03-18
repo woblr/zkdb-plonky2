@@ -48,12 +48,14 @@ impl DataBatch {
     }
 
     pub fn select_rows(&self, indices: &[usize]) -> DataBatch {
-        let columns = self.columns.iter().map(|col| {
-            ColumnData {
+        let columns = self
+            .columns
+            .iter()
+            .map(|col| ColumnData {
                 name: col.name.clone(),
                 values: indices.iter().map(|&i| col.values[i]).collect(),
-            }
-        }).collect();
+            })
+            .collect();
         DataBatch::new(columns)
     }
 }
@@ -78,11 +80,18 @@ pub fn execute_filter(
     column_name: &str,
     predicate: impl Fn(u64) -> bool,
 ) -> FilterResult {
-    let col = input.column_by_name(column_name)
+    let col = input
+        .column_by_name(column_name)
         .expect("filter column not found");
 
-    let selector: Vec<u64> = col.values.iter().map(|&v| if predicate(v) { 1 } else { 0 }).collect();
-    let selected_indices: Vec<usize> = selector.iter().enumerate()
+    let selector: Vec<u64> = col
+        .values
+        .iter()
+        .map(|&v| if predicate(v) { 1 } else { 0 })
+        .collect();
+    let selected_indices: Vec<usize> = selector
+        .iter()
+        .enumerate()
         .filter(|(_, &s)| s == 1)
         .map(|(i, _)| i)
         .collect();
@@ -116,7 +125,11 @@ pub struct AggregateResult {
 pub fn execute_aggregate(values: &[u64]) -> AggregateResult {
     if values.is_empty() {
         return AggregateResult {
-            sum: 0, count: 0, min: 0, max: 0, avg: 0.0,
+            sum: 0,
+            count: 0,
+            min: 0,
+            max: 0,
+            avg: 0.0,
             running_sum_trace: vec![],
         };
     }
@@ -138,7 +151,9 @@ pub fn execute_aggregate(values: &[u64]) -> AggregateResult {
 pub fn execute_filtered_aggregate(values: &[u64], selectors: &[u64]) -> AggregateResult {
     let trace = RunningSumTrace::build(values, selectors);
 
-    let selected_vals: Vec<u64> = values.iter().zip(selectors.iter())
+    let selected_vals: Vec<u64> = values
+        .iter()
+        .zip(selectors.iter())
         .filter(|(_, &s)| s == 1)
         .map(|(&v, _)| v)
         .collect();
@@ -146,7 +161,10 @@ pub fn execute_filtered_aggregate(values: &[u64], selectors: &[u64]) -> Aggregat
     let (min, max) = if selected_vals.is_empty() {
         (0, 0)
     } else {
-        (*selected_vals.iter().min().unwrap(), *selected_vals.iter().max().unwrap())
+        (
+            *selected_vals.iter().min().unwrap(),
+            *selected_vals.iter().max().unwrap(),
+        )
     };
 
     AggregateResult {
@@ -184,25 +202,32 @@ pub struct GroupByResult {
 /// 1. Sorts data by group key (producing a sort permutation trace)
 /// 2. Identifies group boundaries
 /// 3. Accumulates per-group aggregates
-pub fn execute_group_by(
-    group_key_values: &[u64],
-    agg_values: &[u64],
-) -> GroupByResult {
+pub fn execute_group_by(group_key_values: &[u64], agg_values: &[u64]) -> GroupByResult {
     assert_eq!(group_key_values.len(), agg_values.len());
 
     // Step 1: Sort by group key
     let sort_trace = SortTrace::build_ascending(group_key_values);
 
     // Step 2: Apply sort permutation to both key and value columns
-    let sorted_keys: Vec<u64> = sort_trace.permutation.iter().map(|&i| group_key_values[i]).collect();
-    let sorted_vals: Vec<u64> = sort_trace.permutation.iter().map(|&i| agg_values[i]).collect();
+    let sorted_keys: Vec<u64> = sort_trace
+        .permutation
+        .iter()
+        .map(|&i| group_key_values[i])
+        .collect();
+    let sorted_vals: Vec<u64> = sort_trace
+        .permutation
+        .iter()
+        .map(|&i| agg_values[i])
+        .collect();
 
     // Step 3: Identify group boundaries
     let boundary = GroupBoundary::from_sorted_keys(&sorted_keys);
 
     // Step 4: Accumulate per-group aggregates
     let aggregate = GroupAggregate::accumulate(&sorted_keys, &sorted_vals, &boundary);
-    let group_averages: Vec<f64> = aggregate.group_sums.iter()
+    let group_averages: Vec<f64> = aggregate
+        .group_sums
+        .iter()
         .zip(aggregate.group_counts.iter())
         .map(|(&s, &c)| if c > 0 { s as f64 / c as f64 } else { 0.0 })
         .collect();
@@ -221,10 +246,7 @@ pub fn execute_group_by(
 }
 
 /// Execute GROUP BY with multiple group key columns (composite key).
-pub fn execute_group_by_composite(
-    key_columns: &[&[u64]],
-    agg_values: &[u64],
-) -> GroupByResult {
+pub fn execute_group_by_composite(key_columns: &[&[u64]], agg_values: &[u64]) -> GroupByResult {
     if key_columns.is_empty() {
         return execute_group_by(&[], &[]);
     }
@@ -254,14 +276,17 @@ pub fn execute_group_by_composite(
     let sorted_primary_keys: Vec<u64> = indices.iter().map(|&i| key_columns[0][i]).collect();
     let sorted_vals: Vec<u64> = indices.iter().map(|&i| agg_values[i]).collect();
 
-    let sorted_key_columns: Vec<Vec<u64>> = key_columns.iter()
+    let sorted_key_columns: Vec<Vec<u64>> = key_columns
+        .iter()
         .map(|col| indices.iter().map(|&i| col[i]).collect())
         .collect();
     let sorted_key_refs: Vec<&[u64]> = sorted_key_columns.iter().map(|v| v.as_slice()).collect();
 
     let boundary = GroupBoundary::from_sorted_composite_keys(&sorted_key_refs);
     let aggregate = GroupAggregate::accumulate(&sorted_primary_keys, &sorted_vals, &boundary);
-    let group_averages: Vec<f64> = aggregate.group_sums.iter()
+    let group_averages: Vec<f64> = aggregate
+        .group_sums
+        .iter()
         .zip(aggregate.group_counts.iter())
         .map(|(&s, &c)| if c > 0 { s as f64 / c as f64 } else { 0.0 })
         .collect();
@@ -292,7 +317,8 @@ pub struct SortResult {
 
 /// Execute ORDER BY ascending on a column.
 pub fn execute_sort_asc(input: &DataBatch, sort_column: &str) -> SortResult {
-    let col = input.column_by_name(sort_column)
+    let col = input
+        .column_by_name(sort_column)
         .expect("sort column not found");
 
     let sort_trace = SortTrace::build_ascending(&col.values);
@@ -303,7 +329,8 @@ pub fn execute_sort_asc(input: &DataBatch, sort_column: &str) -> SortResult {
 
 /// Execute ORDER BY descending on a column.
 pub fn execute_sort_desc(input: &DataBatch, sort_column: &str) -> SortResult {
-    let col = input.column_by_name(sort_column)
+    let col = input
+        .column_by_name(sort_column)
         .expect("sort column not found");
 
     let sort_trace = SortTrace::build_descending(&col.values);
@@ -313,8 +340,14 @@ pub fn execute_sort_desc(input: &DataBatch, sort_column: &str) -> SortResult {
 }
 
 /// Execute TOP-K (LIMIT after sort).
-pub fn execute_top_k(input: &DataBatch, sort_column: &str, k: usize, ascending: bool) -> SortResult {
-    let col = input.column_by_name(sort_column)
+pub fn execute_top_k(
+    input: &DataBatch,
+    sort_column: &str,
+    k: usize,
+    ascending: bool,
+) -> SortResult {
+    let col = input
+        .column_by_name(sort_column)
         .expect("sort column not found");
 
     let mut sort_trace = if ascending {
@@ -350,9 +383,11 @@ pub fn execute_equi_join(
     left_key: &str,
     right_key: &str,
 ) -> JoinResult {
-    let left_col = left.column_by_name(left_key)
+    let left_col = left
+        .column_by_name(left_key)
         .expect("left join key not found");
-    let right_col = right.column_by_name(right_key)
+    let right_col = right
+        .column_by_name(right_key)
         .expect("right join key not found");
 
     // Build join trace using real hash join from gates module
@@ -363,7 +398,9 @@ pub fn execute_equi_join(
 
     // Add left table columns (prefixed with table name if needed)
     for col in &left.columns {
-        let values: Vec<u64> = join_trace.matched_pairs.iter()
+        let values: Vec<u64> = join_trace
+            .matched_pairs
+            .iter()
             .map(|&(li, _)| col.values[li])
             .collect();
         output_columns.push(ColumnData {
@@ -374,7 +411,9 @@ pub fn execute_equi_join(
 
     // Add right table columns
     for col in &right.columns {
-        let values: Vec<u64> = join_trace.matched_pairs.iter()
+        let values: Vec<u64> = join_trace
+            .matched_pairs
+            .iter()
             .map(|&(_, ri)| col.values[ri])
             .collect();
         output_columns.push(ColumnData {
@@ -413,7 +452,11 @@ pub struct ExecutionTrace {
 impl ExecutionTrace {
     pub fn for_filter(filter: &FilterResult) -> Self {
         let output_hash = blake3::hash(
-            &filter.selector.iter().flat_map(|s| s.to_le_bytes()).collect::<Vec<_>>()
+            &filter
+                .selector
+                .iter()
+                .flat_map(|s| s.to_le_bytes())
+                .collect::<Vec<_>>(),
         );
         Self {
             operator_name: "filter".into(),
@@ -481,9 +524,18 @@ mod tests {
 
     fn sample_batch() -> DataBatch {
         DataBatch::new(vec![
-            ColumnData { name: "id".into(), values: vec![0, 1, 2, 3, 4] },
-            ColumnData { name: "amount".into(), values: vec![100, 500, 200, 800, 300] },
-            ColumnData { name: "region".into(), values: vec![1, 2, 1, 2, 1] },
+            ColumnData {
+                name: "id".into(),
+                values: vec![0, 1, 2, 3, 4],
+            },
+            ColumnData {
+                name: "amount".into(),
+                values: vec![100, 500, 200, 800, 300],
+            },
+            ColumnData {
+                name: "region".into(),
+                values: vec![1, 2, 1, 2, 1],
+            },
         ])
     }
 
@@ -550,12 +602,24 @@ mod tests {
     #[test]
     fn equi_join_execution() {
         let left = DataBatch::new(vec![
-            ColumnData { name: "id".into(), values: vec![1, 2, 3, 4, 5] },
-            ColumnData { name: "dept_id".into(), values: vec![10, 20, 10, 30, 20] },
+            ColumnData {
+                name: "id".into(),
+                values: vec![1, 2, 3, 4, 5],
+            },
+            ColumnData {
+                name: "dept_id".into(),
+                values: vec![10, 20, 10, 30, 20],
+            },
         ]);
         let right = DataBatch::new(vec![
-            ColumnData { name: "dept_id".into(), values: vec![10, 20, 40] },
-            ColumnData { name: "dept_name".into(), values: vec![100, 200, 400] },
+            ColumnData {
+                name: "dept_id".into(),
+                values: vec![10, 20, 40],
+            },
+            ColumnData {
+                name: "dept_name".into(),
+                values: vec![100, 200, 400],
+            },
         ]);
         let result = execute_equi_join(&left, &right, "dept_id", "dept_id");
         // Matches: (0,0), (1,1), (2,0), (4,1)
@@ -592,12 +656,14 @@ mod tests {
 
     #[test]
     fn execution_trace_for_join() {
-        let left = DataBatch::new(vec![
-            ColumnData { name: "key".into(), values: vec![1, 2, 3] },
-        ]);
-        let right = DataBatch::new(vec![
-            ColumnData { name: "key".into(), values: vec![2, 3, 4] },
-        ]);
+        let left = DataBatch::new(vec![ColumnData {
+            name: "key".into(),
+            values: vec![1, 2, 3],
+        }]);
+        let right = DataBatch::new(vec![ColumnData {
+            name: "key".into(),
+            values: vec![2, 3, 4],
+        }]);
         let result = execute_equi_join(&left, &right, "key", "key");
         let trace = ExecutionTrace::for_join(&result);
         assert_eq!(trace.operator_name, "join");

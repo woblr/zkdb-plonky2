@@ -1,7 +1,7 @@
 //! Integration test: runs the benchmark pipeline end-to-end.
 
 use std::sync::Arc;
-use zkdb_plonky2::backend::MockBackend;
+use zkdb_plonky2::backend::ConstraintCheckedBackend;
 use zkdb_plonky2::benchmarks::cases::standard_suite;
 use zkdb_plonky2::benchmarks::dataset::generate_benchmark_dataset;
 use zkdb_plonky2::benchmarks::metrics::results_to_json;
@@ -10,7 +10,7 @@ use zkdb_plonky2::benchmarks::types::{BackendKind, BenchmarkScenario};
 
 #[tokio::test]
 async fn single_benchmark_scenario_succeeds() {
-    let backend = Arc::new(MockBackend::default());
+    let backend = Arc::new(ConstraintCheckedBackend::default());
     let runner = BenchmarkRunner::in_memory(backend);
 
     let scenario = BenchmarkScenario::new(
@@ -34,7 +34,7 @@ async fn single_benchmark_scenario_succeeds() {
 
 #[tokio::test]
 async fn count_aggregate_benchmark() {
-    let backend = Arc::new(MockBackend::default());
+    let backend = Arc::new(ConstraintCheckedBackend::default());
     let runner = BenchmarkRunner::in_memory(backend);
 
     let scenario = BenchmarkScenario::new(
@@ -50,7 +50,7 @@ async fn count_aggregate_benchmark() {
 
 #[tokio::test]
 async fn sum_with_filter_benchmark() {
-    let backend = Arc::new(MockBackend::default());
+    let backend = Arc::new(ConstraintCheckedBackend::default());
     let runner = BenchmarkRunner::in_memory(backend);
 
     let scenario = BenchmarkScenario::new(
@@ -66,8 +66,8 @@ async fn sum_with_filter_benchmark() {
 
 #[tokio::test]
 async fn standard_suite_runs_all_scenarios() {
-    let backend = Arc::new(MockBackend::default());
-    let scenarios = standard_suite(100, BackendKind::Mock);
+    let backend = Arc::new(ConstraintCheckedBackend::default());
+    let scenarios = standard_suite(100, BackendKind::ConstraintChecked);
 
     // Each scenario needs its own runner since each creates a fresh dataset
     let mut results = Vec::new();
@@ -81,16 +81,23 @@ async fn standard_suite_runs_all_scenarios() {
     let successful = results.iter().filter(|r| r.success).count();
 
     println!("\n=== Suite Results ===");
-    println!("Total: {}, Successful: {}, Failed: {}", total, successful, total - successful);
+    println!(
+        "Total: {}, Successful: {}, Failed: {}",
+        total,
+        successful,
+        total - successful
+    );
     for r in &results {
-        println!("  {} — {} — proof: {} bytes, prove: {} µs",
+        println!(
+            "  {} — {} — proof: {} bytes, prove: {} µs",
             r.scenario.name,
             if r.success { "OK" } else { "FAIL" },
             r.metrics.proof_size_bytes,
-            r.metrics.proof_generation_us);
+            r.metrics.proof_generation_us
+        );
     }
 
-    // All scenarios should pass with MockBackend
+    // All scenarios should pass
     assert_eq!(successful, total, "some scenarios failed");
 
     // Verify JSON serialization works
@@ -121,7 +128,7 @@ async fn dataset_generation_is_deterministic() {
 
 #[tokio::test]
 async fn repeated_benchmark_produces_multiple_results() {
-    let backend = Arc::new(MockBackend::default());
+    let backend = Arc::new(ConstraintCheckedBackend::default());
     let runner = BenchmarkRunner::in_memory(backend);
 
     let scenario = BenchmarkScenario::new(

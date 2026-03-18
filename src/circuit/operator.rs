@@ -79,7 +79,9 @@ pub enum CircuitError {
 pub struct TableScanCircuit;
 
 impl OperatorCircuit for TableScanCircuit {
-    fn operator_kind(&self) -> &str { "table_scan" }
+    fn operator_kind(&self) -> &str {
+        "table_scan"
+    }
 
     fn validate_witness(&self, witness: &WitnessTrace) -> Result<[u8; 32], CircuitError> {
         // Constraint: all column traces must have equal length
@@ -88,14 +90,18 @@ impl OperatorCircuit for TableScanCircuit {
             if col.values.len() != expected_rows {
                 return Err(CircuitError::ConstraintViolation(format!(
                     "column {} has {} rows, expected {}",
-                    col.column_name, col.values.len(), expected_rows
+                    col.column_name,
+                    col.values.len(),
+                    expected_rows
                 )));
             }
         }
         Ok(witness.result_commitment)
     }
 
-    fn public_input_count(&self) -> usize { 3 }
+    fn public_input_count(&self) -> usize {
+        3
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,14 +114,20 @@ pub struct FilterCircuit {
 }
 
 impl OperatorCircuit for FilterCircuit {
-    fn operator_kind(&self) -> &str { "filter" }
+    fn operator_kind(&self) -> &str {
+        "filter"
+    }
 
     fn validate_witness(&self, witness: &WitnessTrace) -> Result<[u8; 32], CircuitError> {
         // Constraint 1: selector bitmap must be all-boolean
-        let selector_u64: Vec<u64> = witness.selected.iter().map(|&b| if b { 1 } else { 0 }).collect();
+        let selector_u64: Vec<u64> = witness
+            .selected
+            .iter()
+            .map(|&b| if b { 1 } else { 0 })
+            .collect();
         if !verify_selector(&selector_u64) {
             return Err(CircuitError::ConstraintViolation(
-                "selector contains non-boolean values".into()
+                "selector contains non-boolean values".into(),
             ));
         }
 
@@ -131,7 +143,9 @@ impl OperatorCircuit for FilterCircuit {
         Ok(witness.result_commitment)
     }
 
-    fn public_input_count(&self) -> usize { 4 }
+    fn public_input_count(&self) -> usize {
+        4
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,7 +158,9 @@ pub struct ProjectionCircuit {
 }
 
 impl OperatorCircuit for ProjectionCircuit {
-    fn operator_kind(&self) -> &str { "projection" }
+    fn operator_kind(&self) -> &str {
+        "projection"
+    }
 
     fn validate_witness(&self, witness: &WitnessTrace) -> Result<[u8; 32], CircuitError> {
         // Constraint: output columns exist and have consistent row counts
@@ -153,14 +169,18 @@ impl OperatorCircuit for ProjectionCircuit {
             if col.values.len() != expected {
                 return Err(CircuitError::ConstraintViolation(format!(
                     "projected column {} has {} rows, expected {}",
-                    col.column_name, col.values.len(), expected
+                    col.column_name,
+                    col.values.len(),
+                    expected
                 )));
             }
         }
         Ok(witness.result_commitment)
     }
 
-    fn public_input_count(&self) -> usize { 3 }
+    fn public_input_count(&self) -> usize {
+        3
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -173,7 +193,9 @@ pub struct AggregateCircuit {
 }
 
 impl OperatorCircuit for AggregateCircuit {
-    fn operator_kind(&self) -> &str { "aggregate" }
+    fn operator_kind(&self) -> &str {
+        "aggregate"
+    }
 
     fn validate_witness(&self, witness: &WitnessTrace) -> Result<[u8; 32], CircuitError> {
         // Validate each aggregate witness
@@ -184,7 +206,7 @@ impl OperatorCircuit for AggregateCircuit {
                     // (The aggregate witness value is the final accumulated sum)
                     if agg_w.count == 0 && agg_w.value != FieldElement::ZERO {
                         return Err(CircuitError::ConstraintViolation(
-                            "sum is non-zero but count is 0".into()
+                            "sum is non-zero but count is 0".into(),
                         ));
                     }
                 }
@@ -209,7 +231,9 @@ impl OperatorCircuit for AggregateCircuit {
         Ok(witness.result_commitment)
     }
 
-    fn public_input_count(&self) -> usize { 5 }
+    fn public_input_count(&self) -> usize {
+        5
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -223,7 +247,9 @@ pub struct GroupByCircuit {
 }
 
 impl OperatorCircuit for GroupByCircuit {
-    fn operator_kind(&self) -> &str { "group_by" }
+    fn operator_kind(&self) -> &str {
+        "group_by"
+    }
 
     fn validate_witness(&self, witness: &WitnessTrace) -> Result<[u8; 32], CircuitError> {
         // Constraint 1: key column must be sorted ascending.
@@ -242,7 +268,7 @@ impl OperatorCircuit for GroupByCircuit {
         // Constraint 1: key column must be sorted ascending
         if !verify_sorted_ascending(&key_values).0 {
             return Err(CircuitError::ConstraintViolation(
-                "group key column is not sorted ascending".into()
+                "group key column is not sorted ascending".into(),
             ));
         }
 
@@ -250,14 +276,14 @@ impl OperatorCircuit for GroupByCircuit {
         let boundaries = GroupBoundary::from_sorted_keys(&key_values);
         if !boundaries.verify(&key_values) {
             return Err(CircuitError::ConstraintViolation(
-                "group boundaries don't match sorted keys".into()
+                "group boundaries don't match sorted keys".into(),
             ));
         }
 
         // Constraint 3: non-empty data must have at least 1 group
         if !key_values.is_empty() && boundaries.num_groups == 0 {
             return Err(CircuitError::ConstraintViolation(
-                "group count is 0 for non-empty key column".into()
+                "group count is 0 for non-empty key column".into(),
             ));
         }
 
@@ -280,7 +306,7 @@ impl OperatorCircuit for GroupByCircuit {
             let trace = RunningSumTrace::build(&val_values, &selectors);
             if !trace.verify() {
                 return Err(CircuitError::ConstraintViolation(
-                    "running sum trace is inconsistent".into()
+                    "running sum trace is inconsistent".into(),
                 ));
             }
         }
@@ -288,7 +314,9 @@ impl OperatorCircuit for GroupByCircuit {
         Ok(witness.result_commitment)
     }
 
-    fn public_input_count(&self) -> usize { 6 }
+    fn public_input_count(&self) -> usize {
+        6
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -301,7 +329,9 @@ pub struct SortCircuit {
 }
 
 impl OperatorCircuit for SortCircuit {
-    fn operator_kind(&self) -> &str { "sort" }
+    fn operator_kind(&self) -> &str {
+        "sort"
+    }
 
     fn validate_witness(&self, witness: &WitnessTrace) -> Result<[u8; 32], CircuitError> {
         // Constraint 1: output column must be sorted (ascending or descending).
@@ -316,11 +346,11 @@ impl OperatorCircuit for SortCircuit {
         let sorted_values: Vec<u64> = sort_col.values.iter().map(|f| f.0).collect();
 
         // Constraint 1: values must be sorted (ascending or descending)
-        let ascending  = verify_sorted_ascending(&sorted_values).0;
+        let ascending = verify_sorted_ascending(&sorted_values).0;
         let descending = verify_sorted_descending(&sorted_values).0;
         if !ascending && !descending {
             return Err(CircuitError::ConstraintViolation(
-                "sort column is neither ascending nor descending".into()
+                "sort column is neither ascending nor descending".into(),
             ));
         }
 
@@ -340,7 +370,9 @@ impl OperatorCircuit for SortCircuit {
         Ok(witness.result_commitment)
     }
 
-    fn public_input_count(&self) -> usize { 3 }
+    fn public_input_count(&self) -> usize {
+        3
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -358,7 +390,9 @@ pub struct JoinCircuit {
 }
 
 impl OperatorCircuit for JoinCircuit {
-    fn operator_kind(&self) -> &str { "hash_join" }
+    fn operator_kind(&self) -> &str {
+        "hash_join"
+    }
 
     fn validate_witness(&self, witness: &WitnessTrace) -> Result<[u8; 32], CircuitError> {
         // Constraint 1: for every output row, left join key == right join key.
@@ -368,15 +402,22 @@ impl OperatorCircuit for JoinCircuit {
         // NOTE: Completeness (no missed matches) requires a permutation argument.
         // This circuit enforces correctness only: all reported matches are valid.
 
-        let left_key  = witness.columns.iter().find(|c| c.column_name.starts_with("left_"));
-        let right_key = witness.columns.iter().find(|c| c.column_name.starts_with("right_"));
+        let left_key = witness
+            .columns
+            .iter()
+            .find(|c| c.column_name.starts_with("left_"));
+        let right_key = witness
+            .columns
+            .iter()
+            .find(|c| c.column_name.starts_with("right_"));
 
         if let (Some(lk), Some(rk)) = (left_key, right_key) {
             // Constraint 2: equal column lengths
             if lk.values.len() != rk.values.len() {
                 return Err(CircuitError::ConstraintViolation(format!(
                     "left_key column has {} rows but right_key has {} rows",
-                    lk.values.len(), rk.values.len()
+                    lk.values.len(),
+                    rk.values.len()
                 )));
             }
 
@@ -403,7 +444,9 @@ impl OperatorCircuit for JoinCircuit {
         Ok(witness.result_commitment)
     }
 
-    fn public_input_count(&self) -> usize { 5 }
+    fn public_input_count(&self) -> usize {
+        5
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -420,10 +463,15 @@ pub fn circuit_for_operator(op: &ProofOperator) -> Box<dyn OperatorCircuit> {
         ProofOperator::Projection { items_json } => Box::new(ProjectionCircuit {
             items_json: items_json.clone(),
         }),
-        ProofOperator::PartialAggregate { group_by_json, aggregates_json } => {
+        ProofOperator::PartialAggregate {
+            group_by_json,
+            aggregates_json,
+        } => {
             if group_by_json.is_empty() || group_by_json == "[]" {
                 // Plain aggregate (COUNT(*), SUM without grouping)
-                Box::new(AggregateCircuit { aggregates_json: aggregates_json.clone() })
+                Box::new(AggregateCircuit {
+                    aggregates_json: aggregates_json.clone(),
+                })
             } else {
                 // Grouped aggregate — enforce sort + boundary constraints
                 Box::new(GroupByCircuit {
@@ -432,9 +480,15 @@ pub fn circuit_for_operator(op: &ProofOperator) -> Box<dyn OperatorCircuit> {
                 })
             }
         }
-        ProofOperator::MergeAggregate { group_by_json, aggregates_json, .. } => {
+        ProofOperator::MergeAggregate {
+            group_by_json,
+            aggregates_json,
+            ..
+        } => {
             if group_by_json.is_empty() || group_by_json == "[]" {
-                Box::new(AggregateCircuit { aggregates_json: aggregates_json.clone() })
+                Box::new(AggregateCircuit {
+                    aggregates_json: aggregates_json.clone(),
+                })
             } else {
                 Box::new(GroupByCircuit {
                     group_by_json: group_by_json.clone(),
@@ -445,7 +499,10 @@ pub fn circuit_for_operator(op: &ProofOperator) -> Box<dyn OperatorCircuit> {
         ProofOperator::Sort { keys_json } => Box::new(SortCircuit {
             keys_json: keys_json.clone(),
         }),
-        ProofOperator::HashJoin { condition_json, kind_json } => Box::new(JoinCircuit {
+        ProofOperator::HashJoin {
+            condition_json,
+            kind_json,
+        } => Box::new(JoinCircuit {
             condition_json: condition_json.clone(),
             kind_json: kind_json.clone(),
         }),

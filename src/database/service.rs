@@ -5,9 +5,7 @@ use crate::database::encoding::RawRow;
 use crate::database::ingest::{IngestPipeline, IngestRequest, IngestResult};
 use crate::database::schema::{validate_schema, DatasetSchema};
 use crate::database::snapshot::SnapshotRecord;
-use crate::database::storage::{
-    ChunkStore, DatasetRecord, DatasetRepository, SnapshotRepository,
-};
+use crate::database::storage::{ChunkStore, DatasetRecord, DatasetRepository, SnapshotRepository};
 use crate::types::{DatasetId, DatasetStatus, SnapshotId, ZkDbError, ZkResult};
 use std::sync::Arc;
 
@@ -61,7 +59,12 @@ impl DatasetService {
     // ── Ingestion ─────────────────────────────────────────────────────────
 
     /// Ingest rows into staging. Dataset must exist.
-    pub async fn ingest_rows(&self, dataset_id: &DatasetId, rows: Vec<RawRow>, chunk_size: Option<u32>) -> ZkResult<IngestResult> {
+    pub async fn ingest_rows(
+        &self,
+        dataset_id: &DatasetId,
+        rows: Vec<RawRow>,
+        chunk_size: Option<u32>,
+    ) -> ZkResult<IngestResult> {
         let record = self.dataset_repo.get(dataset_id).await?;
         if record.status == DatasetStatus::Archived {
             return Err(ZkDbError::internal("cannot ingest into archived dataset"));
@@ -116,8 +119,8 @@ impl DatasetService {
         self.chunk_store.clear_staging(dataset_id).await?;
 
         // Persist snapshot record
-        let snap_record = SnapshotRecord::new(snapshot_id.clone(), dataset_id.clone())
-            .with_manifest(manifest);
+        let snap_record =
+            SnapshotRecord::new(snapshot_id.clone(), dataset_id.clone()).with_manifest(manifest);
         self.snapshot_repo.create(snap_record.clone()).await?;
 
         self.dataset_repo
@@ -172,10 +175,7 @@ impl DatasetService {
         self.snapshot_repo.list_for_dataset(dataset_id).await
     }
 
-    pub async fn get_active_snapshot(
-        &self,
-        dataset_id: &DatasetId,
-    ) -> ZkResult<SnapshotRecord> {
+    pub async fn get_active_snapshot(&self, dataset_id: &DatasetId) -> ZkResult<SnapshotRecord> {
         let record = self.dataset_repo.get(dataset_id).await?;
         let snap_id = record
             .active_snapshot_id

@@ -66,6 +66,8 @@ pub enum PhysicalNode {
         right: Box<PhysicalNode>,
         kind: crate::types::JoinKind,
         condition: Option<crate::query::ast::Expr>,
+        /// The Poseidon commitment of the right table snapshot.
+        right_poseidon_snap_lo: Option<u64>,
     },
 }
 
@@ -103,10 +105,7 @@ pub struct PhysicalPlan {
 pub struct PhysicalPlanner;
 
 impl PhysicalPlanner {
-    pub fn plan(
-        logical: LogicalPlan,
-        manifest: &SnapshotManifest,
-    ) -> ZkResult<PhysicalPlan> {
+    pub fn plan(logical: LogicalPlan, manifest: &SnapshotManifest) -> ZkResult<PhysicalPlan> {
         let chunk_indices: Vec<u32> = manifest.chunks.iter().map(|c| c.chunk_index).collect();
         let chunk_count = chunk_indices.len() as u32;
         let estimated_row_count = manifest.row_count;
@@ -116,6 +115,7 @@ impl PhysicalPlanner {
             &chunk_indices,
             &logical.dataset_id,
             &logical.snapshot_id,
+            manifest,
         )?;
 
         Ok(PhysicalPlan {
@@ -132,19 +132,24 @@ impl PhysicalPlanner {
         chunk_indices: &[u32],
         dataset_id: &DatasetId,
         snapshot_id: &SnapshotId,
+        manifest: &SnapshotManifest,
     ) -> ZkResult<PhysicalNode> {
         match node {
-            LogicalNode::TableScan { dataset_id, snapshot_id, columns, .. } => {
-                Ok(PhysicalNode::ChunkedScan {
-                    dataset_id,
-                    snapshot_id,
-                    chunk_indices: chunk_indices.to_vec(),
-                    columns,
-                })
-            }
+            LogicalNode::TableScan {
+                dataset_id,
+                snapshot_id,
+                columns,
+                ..
+            } => Ok(PhysicalNode::ChunkedScan {
+                dataset_id,
+                snapshot_id,
+                chunk_indices: chunk_indices.to_vec(),
+                columns,
+            }),
 
             LogicalNode::Filter { input, predicate } => {
-                let phys_input = Self::translate_node(*input, chunk_indices, dataset_id, snapshot_id)?;
+                let phys_input =
+                    Self::translate_node(*input, chunk_indices, dataset_id, snapshot_id, manifest)?;
                 Ok(PhysicalNode::Filter {
                     input: Box::new(phys_input),
                     predicate,
@@ -152,15 +157,22 @@ impl PhysicalPlanner {
             }
 
             LogicalNode::Projection { input, items } => {
-                let phys_input = Self::translate_node(*input, chunk_indices, dataset_id, snapshot_id)?;
+                let phys_input =
+                    Self::translate_node(*input, chunk_indices, dataset_id, snapshot_id, manifest)?;
                 Ok(PhysicalNode::Projection {
                     input: Box::new(phys_input),
                     items,
                 })
             }
 
-            LogicalNode::Aggregate { input, group_by, aggregates, having } => {
-                let phys_input = Self::translate_node(*input, chunk_indices, dataset_id, snapshot_id)?;
+            LogicalNode::Aggregate {
+                input,
+                group_by,
+                aggregates,
+                having,
+            } => {
+                let phys_input =
+                    Self::translate_node(*input, chunk_indices, dataset_id, snapshot_id, manifest)?;
                 // Two-phase aggregation: partial then merge.
                 let partial = PhysicalNode::PartialAggregate {
                     input: Box::new(phys_input),
@@ -176,7 +188,8 @@ impl PhysicalPlanner {
             }
 
             LogicalNode::Sort { input, keys } => {
-                let phys_input = Self::translate_node(*input, chunk_indices, dataset_id, snapshot_id)?;
+                let phys_input =
+                    Self::translate_node(*input, chunk_indices, dataset_id, snapshot_id, manifest)?;
                 Ok(PhysicalNode::Sort {
                     input: Box::new(phys_input),
                     keys,
@@ -184,7 +197,8 @@ impl PhysicalPlanner {
             }
 
             LogicalNode::Limit { input, n, offset } => {
-                let phys_input = Self::translate_node(*input, chunk_indices, dataset_id, snapshot_id)?;
+                let phys_input =
+                    Self::translate_node(*input, chunk_indices, dataset_id, snapshot_id, manifest)?;
                 Ok(PhysicalNode::Limit {
                     input: Box::new(phys_input),
                     n,
@@ -192,14 +206,24 @@ impl PhysicalPlanner {
                 })
             }
 
-            LogicalNode::Join { left, right, kind, condition } => {
-                let phys_left = Self::translate_node(*left, chunk_indices, dataset_id, snapshot_id)?;
-                let phys_right = Self::translate_node(*right, chunk_indices, dataset_id, snapshot_id)?;
+            LogicalNode::Join {
+                left,
+                right,
+                kind,
+                condition,
+            } => {
+                let phys_left =
+                    Self::translate_node(*left, chunk_indices, dataset_id, snapshot_id, manifest)?;
+                let phys_right =
+                    Self::translate_node(*right, chunk_indices, dataset_id, snapshot_id, manifest)?;
                 Ok(PhysicalNode::HashJoin {
                     left: Box::new(phys_left),
                     right: Box::new(phys_right),
                     kind,
                     condition,
+                    // TODO(completeness): In a multi-table query, this should be the right table's manifest commitment.
+                    // For now, if we're self-joining, we use the primary manifest's poseidon_snap_lo.
+                    right_poseidon_snap_lo: Some(manifest.poseidon_snap_lo),
                 })
             }
         }

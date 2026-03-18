@@ -1,12 +1,12 @@
 //! Maps domain errors to HTTP responses.
 
+use crate::types::ZkDbError;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
 use serde::Serialize;
-use crate::types::ZkDbError;
 
 #[derive(Debug, Serialize)]
 pub struct ErrorBody {

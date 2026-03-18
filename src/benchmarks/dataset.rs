@@ -43,8 +43,18 @@ pub fn transactions_schema(dataset_id: DatasetId) -> DatasetSchema {
             ColumnSchema::new("id", ColumnType::U64),
             ColumnSchema::new("user_id", ColumnType::U64),
             ColumnSchema::new("amount", ColumnType::U64),
-            ColumnSchema::new("category", ColumnType::Text { max_bytes: Some(32) }),
-            ColumnSchema::new("region", ColumnType::Text { max_bytes: Some(16) }),
+            ColumnSchema::new(
+                "category",
+                ColumnType::Text {
+                    max_bytes: Some(32),
+                },
+            ),
+            ColumnSchema::new(
+                "region",
+                ColumnType::Text {
+                    max_bytes: Some(16),
+                },
+            ),
             ColumnSchema::new("timestamp", ColumnType::U64),
             ColumnSchema::new("score", ColumnType::U64),
             ColumnSchema::new("flag", ColumnType::Bool),
@@ -62,13 +72,13 @@ pub fn generate_transactions(row_count: usize) -> Vec<RawRow> {
     for i in 0..row_count {
         let hash = wrapping_hash(i as u64);
 
-        let user_id = (hash % 10_000) as u64;
-        let amount = ((hash >> 8) % 100_000) as u64;
+        let user_id = (hash % 10_000);
+        let amount = ((hash >> 8) % 100_000);
         let category_idx = ((hash >> 16) % CATEGORIES.len() as u64) as usize;
         let region_idx = ((hash >> 24) % REGIONS.len() as u64) as usize;
         let timestamp = 1_700_000_000u64 + (i as u64 * 60);
-        let score = ((hash >> 32) % 1000) as u64;
-        let flag = (hash >> 40) % 2 == 0;
+        let score = ((hash >> 32) % 1000);
+        let flag = (hash >> 40).is_multiple_of(2);
 
         let values = vec![
             Value::Number(serde_json::Number::from(i as u64)),
@@ -122,7 +132,11 @@ pub enum DistributionProfile {
     /// Values clustered around `center` with given `spread`.
     Skewed { center: u64, spread: u64 },
     /// 80% of values fall in a small "hot" range.
-    Hotspot { hot_min: u64, hot_max: u64, cold_max: u64 },
+    Hotspot {
+        hot_min: u64,
+        hot_max: u64,
+        cold_max: u64,
+    },
     /// All values are the same (worst-case for certain circuits).
     Constant(u64),
 }
@@ -206,7 +220,7 @@ pub fn generate_with_profile(profile: &DatasetProfile) -> Vec<RawRow> {
         let region_idx = ((hash >> 24) % regions_subset.len() as u64) as usize;
         let timestamp = 1_700_000_000u64 + (i as u64 * 60);
         let score = apply_distribution(&profile.score_distribution, hash >> 32, 1000);
-        let flag = (hash >> 40) % 2 == 0;
+        let flag = (hash >> 40).is_multiple_of(2);
 
         let values = vec![
             Value::Number(serde_json::Number::from(i as u64)),
@@ -237,9 +251,13 @@ fn apply_distribution(dist: &DistributionProfile, hash: u64, default_max: u64) -
             let offset = (hash % (spread * 2)) as i64 - *spread as i64;
             (*center as i64 + offset).max(0) as u64
         }
-        DistributionProfile::Hotspot { hot_min, hot_max, cold_max } => {
+        DistributionProfile::Hotspot {
+            hot_min,
+            hot_max,
+            cold_max,
+        } => {
             // 80% hot, 20% cold
-            if hash % 5 != 0 {
+            if !hash.is_multiple_of(5) {
                 // Hot range
                 hot_min + (hash % (hot_max - hot_min + 1))
             } else {
@@ -286,14 +304,24 @@ mod tests {
 
 /// Canonical departments used in the employees dataset.
 const DEPARTMENTS: &[&str] = &[
-    "engineering", "marketing", "sales", "finance",
-    "hr", "operations", "legal", "research",
+    "engineering",
+    "marketing",
+    "sales",
+    "finance",
+    "hr",
+    "operations",
+    "legal",
+    "research",
 ];
 
 /// Canonical office locations.
 const OFFICES: &[&str] = &[
-    "new-york", "san-francisco", "london", "berlin",
-    "tokyo", "singapore",
+    "new-york",
+    "san-francisco",
+    "london",
+    "berlin",
+    "tokyo",
+    "singapore",
 ];
 
 /// Build the schema for the benchmark "employees" dataset.
@@ -303,8 +331,18 @@ pub fn employees_schema(dataset_id: DatasetId) -> DatasetSchema {
         "benchmark_employees",
         vec![
             ColumnSchema::new("employee_id", ColumnType::U64),
-            ColumnSchema::new("department", ColumnType::Text { max_bytes: Some(32) }),
-            ColumnSchema::new("office", ColumnType::Text { max_bytes: Some(24) }),
+            ColumnSchema::new(
+                "department",
+                ColumnType::Text {
+                    max_bytes: Some(32),
+                },
+            ),
+            ColumnSchema::new(
+                "office",
+                ColumnType::Text {
+                    max_bytes: Some(24),
+                },
+            ),
             ColumnSchema::new("salary", ColumnType::U64),
             ColumnSchema::new("manager_id", ColumnType::U64),
             ColumnSchema::new("performance_score", ColumnType::U64),
@@ -325,7 +363,7 @@ pub fn generate_employees(row_count: usize) -> Vec<RawRow> {
         let department_idx = ((hash >> 4) % DEPARTMENTS.len() as u64) as usize;
         let office_idx = ((hash >> 12) % OFFICES.len() as u64) as usize;
         let salary = 30_000 + (hash % 170_000); // 30k–200k range
-        // Manager is a lower employee_id (0 for top-level)
+                                                // Manager is a lower employee_id (0 for top-level)
         let manager_id = if i == 0 { 0 } else { hash % (i as u64) };
         let performance_score = 1 + ((hash >> 20) % 100); // 1–100
 

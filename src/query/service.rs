@@ -52,6 +52,7 @@ pub struct QueryResult {
     pub result_json: Option<String>,
     /// Proof ID if proving completed.
     pub proof_id: Option<crate::types::ProofId>,
+    pub capabilities: Option<crate::proof::artifacts::ProofCapabilities>,
     pub error: Option<String>,
 }
 
@@ -112,10 +113,7 @@ pub struct QueryService {
 }
 
 impl QueryService {
-    pub fn new(
-        dataset_service: Arc<DatasetService>,
-        policy_engine: Arc<PolicyEngine>,
-    ) -> Self {
+    pub fn new(dataset_service: Arc<DatasetService>, policy_engine: Arc<PolicyEngine>) -> Self {
         Self {
             dataset_service,
             policy_engine,
@@ -200,11 +198,21 @@ impl QueryService {
         // Physical plan
         let physical_plan = PhysicalPlanner::plan(logical_plan, manifest)?;
 
+        // Schema JSON for schema-aware witness building
+        let schema_json = self
+            .dataset_service
+            .get_dataset(&normalized.dataset_id)
+            .await
+            .ok()
+            .and_then(|r| serde_json::to_string(&r.schema).ok());
+
         // Proof plan
         let proof_plan = ProofPlanner::plan(
             physical_plan,
             normalized.snapshot_root.clone(),
             normalized.query_id.clone(),
+            manifest,
+            schema_json,
         )?;
 
         Ok(proof_plan)

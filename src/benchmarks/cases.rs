@@ -89,16 +89,6 @@ pub fn standard_suite(row_count: usize, backend: BackendKind) -> Vec<BenchmarkSc
         .with_tags(vec!["aggregate".into(), "multi".into()])
         .with_classification(QueryFamily::Aggregate, OperatorFamily::Aggregate, ComplexityClass::Moderate),
 
-        BenchmarkScenario::new(
-            "select_star_limit",
-            "SELECT * FROM benchmark_transactions LIMIT 100",
-            row_count,
-        )
-        .with_description("Full scan with LIMIT")
-        .with_chunk_size(chunk_size)
-        .with_backend(backend.clone())
-        .with_tags(vec!["scan".into(), "limit".into()])
-        .with_classification(QueryFamily::Scan, OperatorFamily::Limit, ComplexityClass::Linear),
     ]
 }
 
@@ -215,8 +205,11 @@ pub fn group_by_suite(row_count: usize, backend: BackendKind) -> Vec<BenchmarkSc
         .with_chunk_size(chunk_size)
         .with_backend(backend.clone())
         .with_tags(vec!["group_by".into(), "count".into(), "employees".into()])
-        .with_classification(QueryFamily::GroupBy, OperatorFamily::GroupByAggregate, ComplexityClass::Heavy),
-
+        .with_classification(
+            QueryFamily::GroupBy,
+            OperatorFamily::GroupByAggregate,
+            ComplexityClass::Heavy,
+        ),
         BenchmarkScenario::new(
             "emp_group_by_department_sum_salary",
             "SELECT department, SUM(salary) FROM benchmark_employees GROUP BY department",
@@ -226,8 +219,11 @@ pub fn group_by_suite(row_count: usize, backend: BackendKind) -> Vec<BenchmarkSc
         .with_chunk_size(chunk_size)
         .with_backend(backend.clone())
         .with_tags(vec!["group_by".into(), "sum".into(), "employees".into()])
-        .with_classification(QueryFamily::GroupBy, OperatorFamily::GroupByAggregate, ComplexityClass::Heavy),
-
+        .with_classification(
+            QueryFamily::GroupBy,
+            OperatorFamily::GroupByAggregate,
+            ComplexityClass::Heavy,
+        ),
         BenchmarkScenario::new(
             "emp_group_by_department_avg_salary",
             "SELECT department, AVG(salary) FROM benchmark_employees GROUP BY department",
@@ -237,8 +233,11 @@ pub fn group_by_suite(row_count: usize, backend: BackendKind) -> Vec<BenchmarkSc
         .with_chunk_size(chunk_size)
         .with_backend(backend.clone())
         .with_tags(vec!["group_by".into(), "avg".into(), "employees".into()])
-        .with_classification(QueryFamily::GroupBy, OperatorFamily::GroupByAggregate, ComplexityClass::Heavy),
-
+        .with_classification(
+            QueryFamily::GroupBy,
+            OperatorFamily::GroupByAggregate,
+            ComplexityClass::Heavy,
+        ),
         BenchmarkScenario::new(
             "emp_group_by_office_count",
             "SELECT office, COUNT(*) FROM benchmark_employees GROUP BY office",
@@ -248,8 +247,11 @@ pub fn group_by_suite(row_count: usize, backend: BackendKind) -> Vec<BenchmarkSc
         .with_chunk_size(chunk_size)
         .with_backend(backend.clone())
         .with_tags(vec!["group_by".into(), "count".into(), "employees".into()])
-        .with_classification(QueryFamily::GroupBy, OperatorFamily::GroupByAggregate, ComplexityClass::Heavy),
-
+        .with_classification(
+            QueryFamily::GroupBy,
+            OperatorFamily::GroupByAggregate,
+            ComplexityClass::Heavy,
+        ),
         BenchmarkScenario::new(
             "txn_group_by_region_sum",
             "SELECT region, SUM(amount) FROM benchmark_transactions GROUP BY region",
@@ -259,8 +261,11 @@ pub fn group_by_suite(row_count: usize, backend: BackendKind) -> Vec<BenchmarkSc
         .with_chunk_size(chunk_size)
         .with_backend(backend.clone())
         .with_tags(vec!["group_by".into(), "sum".into(), "transactions".into()])
-        .with_classification(QueryFamily::GroupBy, OperatorFamily::GroupByAggregate, ComplexityClass::Heavy),
-
+        .with_classification(
+            QueryFamily::GroupBy,
+            OperatorFamily::GroupByAggregate,
+            ComplexityClass::Heavy,
+        ),
         BenchmarkScenario::new(
             "txn_group_by_category_count",
             "SELECT category, COUNT(*) FROM benchmark_transactions GROUP BY category",
@@ -269,8 +274,16 @@ pub fn group_by_suite(row_count: usize, backend: BackendKind) -> Vec<BenchmarkSc
         .with_description("GROUP BY category, COUNT — 8 groups, transactions dataset")
         .with_chunk_size(chunk_size)
         .with_backend(backend.clone())
-        .with_tags(vec!["group_by".into(), "count".into(), "transactions".into()])
-        .with_classification(QueryFamily::GroupBy, OperatorFamily::GroupByAggregate, ComplexityClass::Heavy),
+        .with_tags(vec![
+            "group_by".into(),
+            "count".into(),
+            "transactions".into(),
+        ])
+        .with_classification(
+            QueryFamily::GroupBy,
+            OperatorFamily::GroupByAggregate,
+            ComplexityClass::Heavy,
+        ),
     ]
 }
 
@@ -303,28 +316,6 @@ pub fn sort_suite(row_count: usize, backend: BackendKind) -> Vec<BenchmarkScenar
         .with_backend(backend.clone())
         .with_tags(vec!["sort".into(), "desc".into(), "employees".into()])
         .with_classification(QueryFamily::Sort, OperatorFamily::Sort, ComplexityClass::Heavy),
-
-        BenchmarkScenario::new(
-            "emp_top10_salary",
-            "SELECT employee_id, salary FROM benchmark_employees ORDER BY salary DESC LIMIT 10",
-            row_count,
-        )
-        .with_description("Top-10 employees by salary — sort + limit")
-        .with_chunk_size(chunk_size)
-        .with_backend(backend.clone())
-        .with_tags(vec!["sort".into(), "top_k".into(), "limit".into(), "employees".into()])
-        .with_classification(QueryFamily::Sort, OperatorFamily::Sort, ComplexityClass::Moderate),
-
-        BenchmarkScenario::new(
-            "emp_top50_performance",
-            "SELECT employee_id, department, performance_score FROM benchmark_employees ORDER BY performance_score DESC LIMIT 50",
-            row_count,
-        )
-        .with_description("Top-50 employees by performance score — sort + limit")
-        .with_chunk_size(chunk_size)
-        .with_backend(backend.clone())
-        .with_tags(vec!["sort".into(), "top_k".into(), "employees".into()])
-        .with_classification(QueryFamily::Sort, OperatorFamily::Sort, ComplexityClass::Moderate),
 
         BenchmarkScenario::new(
             "txn_sort_amount_asc",

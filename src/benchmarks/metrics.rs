@@ -46,15 +46,26 @@ pub fn compare_results(a: &BenchmarkResult, b: &BenchmarkResult) {
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│  Benchmark Comparison                                       │");
     println!("├────────────────────────┬──────────────────┬─────────────────┤");
-    println!("│  Metric                │  {:^16} │  {:^15} │", a.scenario.name, b.scenario.name);
+    println!(
+        "│  Metric                │  {:^16} │  {:^15} │",
+        a.scenario.name, b.scenario.name
+    );
     println!("├────────────────────────┼──────────────────┼─────────────────┤");
 
     let am = &a.metrics;
     let bm = &b.metrics;
 
-    print_comparison_row("Proof gen (µs)", am.proof_generation_us, bm.proof_generation_us);
+    print_comparison_row(
+        "Proof gen (µs)",
+        am.proof_generation_us,
+        bm.proof_generation_us,
+    );
     print_comparison_row("Verification (µs)", am.verification_us, bm.verification_us);
-    print_comparison_row("Proof size (B)", am.proof_size_bytes as u64, bm.proof_size_bytes as u64);
+    print_comparison_row(
+        "Proof size (B)",
+        am.proof_size_bytes as u64,
+        bm.proof_size_bytes as u64,
+    );
     print_comparison_row("Total (µs)", am.total_us, bm.total_us);
     print_comparison_row("Rows", am.row_count as u64, bm.row_count as u64);
     print_comparison_row("Chunks", am.chunk_count as u64, bm.chunk_count as u64);
@@ -92,7 +103,10 @@ pub fn aggregate_metrics(metrics: &[BenchmarkMetrics]) -> AggregateStats {
     }
     let _n = metrics.len() as f64;
 
-    let proof_gen: Vec<f64> = metrics.iter().map(|m| m.proof_generation_us as f64).collect();
+    let proof_gen: Vec<f64> = metrics
+        .iter()
+        .map(|m| m.proof_generation_us as f64)
+        .collect();
     let verification: Vec<f64> = metrics.iter().map(|m| m.verification_us as f64).collect();
     let proof_size: Vec<f64> = metrics.iter().map(|m| m.proof_size_bytes as f64).collect();
     let total: Vec<f64> = metrics.iter().map(|m| m.total_us as f64).collect();
@@ -128,24 +142,36 @@ pub struct AggregateStats {
 impl AggregateStats {
     pub fn print(&self) {
         println!("Aggregate over {} runs:", self.runs);
-        println!("  Proof gen:    {:.1} ± {:.1} µs (min={}, max={})",
+        println!(
+            "  Proof gen:    {:.1} ± {:.1} µs (min={}, max={})",
             self.proof_generation_mean_us,
             self.proof_generation_stddev_us,
             self.min_proof_generation_us,
-            self.max_proof_generation_us);
-        println!("  Verification: {:.1} ± {:.1} µs", self.verification_mean_us, self.verification_stddev_us);
+            self.max_proof_generation_us
+        );
+        println!(
+            "  Verification: {:.1} ± {:.1} µs",
+            self.verification_mean_us, self.verification_stddev_us
+        );
         println!("  Proof size:   {:.0} bytes", self.proof_size_mean_bytes);
-        println!("  Total:        {:.1} ± {:.1} µs", self.total_mean_us, self.total_stddev_us);
+        println!(
+            "  Total:        {:.1} ± {:.1} µs",
+            self.total_mean_us, self.total_stddev_us
+        );
     }
 }
 
 fn mean(vals: &[f64]) -> f64 {
-    if vals.is_empty() { return 0.0; }
+    if vals.is_empty() {
+        return 0.0;
+    }
     vals.iter().sum::<f64>() / vals.len() as f64
 }
 
 fn stddev(vals: &[f64]) -> f64 {
-    if vals.len() < 2 { return 0.0; }
+    if vals.len() < 2 {
+        return 0.0;
+    }
     let m = mean(vals);
     let variance = vals.iter().map(|v| (v - m).powi(2)).sum::<f64>() / (vals.len() - 1) as f64;
     variance.sqrt()

@@ -4,7 +4,6 @@
 //! and accumulate per-group aggregates. This is the constraint logic
 //! that backs the group_by operator circuit.
 
-
 /// A group boundary marker: indicates where groups start/end in sorted data.
 #[derive(Debug, Clone)]
 pub struct GroupBoundary {
@@ -120,18 +119,18 @@ pub struct GroupAggregate {
 
 impl GroupAggregate {
     /// Compute per-group SUM and COUNT from sorted data + boundaries.
-    pub fn accumulate(
-        keys: &[u64],
-        values: &[u64],
-        boundaries: &GroupBoundary,
-    ) -> Self {
+    pub fn accumulate(keys: &[u64], values: &[u64], boundaries: &GroupBoundary) -> Self {
         let num_groups = boundaries.num_groups as usize;
         let mut group_keys = Vec::with_capacity(num_groups);
         let mut group_sums = vec![0u64; num_groups];
         let mut group_counts = vec![0u64; num_groups];
 
         if keys.is_empty() {
-            return Self { group_keys, group_sums, group_counts };
+            return Self {
+                group_keys,
+                group_sums,
+                group_counts,
+            };
         }
 
         // First group key
@@ -146,7 +145,11 @@ impl GroupAggregate {
             group_counts[g] += 1;
         }
 
-        Self { group_keys, group_sums, group_counts }
+        Self {
+            group_keys,
+            group_sums,
+            group_counts,
+        }
     }
 
     /// Compute per-group average.
@@ -155,7 +158,11 @@ impl GroupAggregate {
             .iter()
             .zip(self.group_counts.iter())
             .map(|(&s, &c)| {
-                if c == 0 { None } else { Some(s as f64 / c as f64) }
+                if c == 0 {
+                    None
+                } else {
+                    Some(s as f64 / c as f64)
+                }
             })
             .collect()
     }

@@ -3,7 +3,8 @@
 //! A snapshot is an immutable, committed view of a dataset at a point in time.
 //! Only committed snapshots may be used as proof targets.
 
-use crate::commitment::root::{CommitmentRoot, ChunkEntry, TableRoot};
+use crate::commitment::root::{ChunkEntry, CommitmentRoot, TableRoot};
+
 use crate::types::{DatasetId, SnapshotId, SnapshotStatus, ZkDbError, ZkResult};
 use serde::{Deserialize, Serialize};
 
@@ -54,6 +55,16 @@ pub struct SnapshotManifest {
     pub encoding_spec_version: u8,
 
     pub committed_at_ms: u64,
+
+    /// Poseidon commitment over individual columns, padded to MAX_ROWS.
+    /// Maps column name -> compute_snap_lo(MAX_ROWS, &column_fes).
+    /// Used as PI[0] in operator circuits, so the WitnessBuilder can select the
+    /// appropriate column root depending on the query's primary operator.
+    /// Backward compatible keys like `__primary` can be used for root fallbacks.
+    pub column_poseidon_roots: std::collections::HashMap<String, u64>,
+    
+    /// Default fallback (legacy) — Poseidon commitment over first 8 bytes.
+    pub poseidon_snap_lo: u64,
 }
 
 impl SnapshotManifest {
@@ -67,6 +78,8 @@ impl SnapshotManifest {
         row_count: u64,
         chunk_size: u32,
         encoding_spec_version: u8,
+        column_poseidon_roots: std::collections::HashMap<String, u64>,
+        poseidon_snap_lo: u64,
     ) -> Self {
         let chunk_count = chunks.len() as u32;
         Self {
@@ -81,6 +94,8 @@ impl SnapshotManifest {
             chunk_size,
             encoding_spec_version,
             committed_at_ms: now_ms(),
+            column_poseidon_roots,
+            poseidon_snap_lo,
         }
     }
 

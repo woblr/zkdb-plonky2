@@ -1,7 +1,7 @@
 //! Logical plan — backend-agnostic relational algebra tree.
 
-use crate::query::ast::{Expr, OrderByItem};
 use crate::query::ast::SelectStatement;
+use crate::query::ast::{Expr, OrderByItem};
 use crate::types::{AggKind, DatasetId, JoinKind, SnapshotId, ZkResult};
 use serde::{Deserialize, Serialize};
 
@@ -109,7 +109,10 @@ pub struct LogicalPlanner {
 
 impl LogicalPlanner {
     pub fn new(dataset_id: DatasetId, snapshot_id: SnapshotId) -> Self {
-        Self { dataset_id, snapshot_id }
+        Self {
+            dataset_id,
+            snapshot_id,
+        }
     }
 
     pub fn plan(&self, stmt: SelectStatement) -> ZkResult<LogicalPlan> {
@@ -206,7 +209,11 @@ impl LogicalPlanner {
 
 fn collect_agg_exprs(expr: &Expr, alias: Option<String>, out: &mut Vec<AggExpr>) {
     match expr {
-        Expr::Agg { kind, input, distinct } => {
+        Expr::Agg {
+            kind,
+            input,
+            distinct,
+        } => {
             out.push(AggExpr {
                 kind: kind.clone(),
                 input: *input.clone(),

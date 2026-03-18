@@ -74,9 +74,7 @@ pub async fn get_dataset(
 // GET /v1/datasets
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub async fn list_datasets(
-    State(state): State<AppState>,
-) -> ApiResult<Json<Vec<DatasetResponse>>> {
+pub async fn list_datasets(State(state): State<AppState>) -> ApiResult<Json<Vec<DatasetResponse>>> {
     let records = state
         .dataset_service
         .list_datasets()
@@ -132,7 +130,10 @@ pub async fn ingest_rows(
         row_count,
         submitted_at_ms: now_ms(),
     }));
-    state.job_registry.mark_completed(&job.job_id, Some(format!("{} rows", result.rows_ingested))).ok();
+    state
+        .job_registry
+        .mark_completed(&job.job_id, Some(format!("{} rows", result.rows_ingested)))
+        .ok();
 
     Ok((
         StatusCode::OK,
@@ -167,7 +168,10 @@ pub async fn create_snapshot(
         dataset_id: id,
         submitted_at_ms: now_ms(),
     }));
-    state.job_registry.mark_completed(&job.job_id, Some(snap.snapshot_id.to_string())).ok();
+    state
+        .job_registry
+        .mark_completed(&job.job_id, Some(snap.snapshot_id.to_string()))
+        .ok();
 
     Ok((StatusCode::CREATED, Json(snap.into())))
 }
@@ -214,13 +218,21 @@ pub async fn list_snapshots(
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn parse_dataset_id(s: &str) -> ApiResult<DatasetId> {
-    s.parse::<DatasetId>()
-        .map_err(|_| ApiError(crate::types::ZkDbError::internal(format!("invalid dataset_id: {}", s))))
+    s.parse::<DatasetId>().map_err(|_| {
+        ApiError(crate::types::ZkDbError::internal(format!(
+            "invalid dataset_id: {}",
+            s
+        )))
+    })
 }
 
 fn parse_snapshot_id(s: &str) -> ApiResult<SnapshotId> {
-    s.parse::<SnapshotId>()
-        .map_err(|_| ApiError(crate::types::ZkDbError::internal(format!("invalid snapshot_id: {}", s))))
+    s.parse::<SnapshotId>().map_err(|_| {
+        ApiError(crate::types::ZkDbError::internal(format!(
+            "invalid snapshot_id: {}",
+            s
+        )))
+    })
 }
 
 fn now_ms() -> u64 {

@@ -72,7 +72,10 @@ pub struct CanonicalRowCounts {
 
 impl Default for CanonicalRowCounts {
     fn default() -> Self {
-        Self { transactions: 1000, employees: 200 }
+        Self {
+            transactions: 1000,
+            employees: 200,
+        }
     }
 }
 
@@ -271,7 +274,7 @@ impl ReportContext {
         let arch = std::env::consts::ARCH.to_string();
         match kind {
             BackendKind::Mock => Self {
-                backend_name: "MockBackend (stub)".into(),
+                backend_name: "NoProofSentinel (removed backend)".into(),
                 backend_kind: "mock".into(),
                 proof_system_kind: "none".into(),
                 is_zero_knowledge: false,
@@ -282,7 +285,9 @@ impl ReportContext {
                     "Proof size is not meaningful".into(),
                     "Verification is trivial (non-empty bytes check)".into(),
                 ],
-                generated_at: now, os, arch,
+                generated_at: now,
+                os,
+                arch,
             },
             BackendKind::ConstraintChecked | BackendKind::Baseline => Self {
                 backend_name: "ConstraintCheckedBackend (hash-chain audit)".into(),
@@ -298,21 +303,24 @@ impl ReportContext {
                     "Proof size grows linearly with row count".into(),
                     "This is a hash-chain audit log, NOT a SNARK/STARK".into(),
                 ],
-                generated_at: now, os, arch,
+                generated_at: now,
+                os,
+                arch,
             },
             BackendKind::Plonky2 => Self {
-                backend_name: "Plonky2Backend (FRI SNARK — stub)".into(),
+                backend_name: "Plonky2Backend (FRI SNARK — fully wired)".into(),
                 backend_kind: "plonky2".into(),
                 proof_system_kind: "plonky2_snark".into(),
                 is_zero_knowledge: true,
                 is_succinct: true,
                 has_real_constraints: true,
                 limitations: vec![
-                    "Proving is NOT YET WIRED in this build".into(),
-                    "All timings are structural stubs".into(),
-                    "Proof size is not meaningful in this build".into(),
+                    "Recursive proof folding (fold()) not yet implemented".into(),
+                    "MAX_ROWS is fixed at compile time; very large datasets require chunking".into(),
                 ],
-                generated_at: now, os, arch,
+                generated_at: now,
+                os,
+                arch,
             },
             _ => Self {
                 backend_name: format!("{} (stub)", kind),
@@ -322,7 +330,9 @@ impl ReportContext {
                 is_succinct: false,
                 has_real_constraints: false,
                 limitations: vec!["Backend is a stub".into()],
-                generated_at: now, os, arch,
+                generated_at: now,
+                os,
+                arch,
             },
         }
     }
@@ -366,18 +376,29 @@ impl ReportGenerator {
             ctx.generated_at,
             ctx.backend_name,
             ctx.proof_system_kind,
-            if ctx.is_zero_knowledge { "✅ Yes" } else { "❌ No" },
+            if ctx.is_zero_knowledge {
+                "✅ Yes"
+            } else {
+                "❌ No"
+            },
             if ctx.is_succinct { "✅ Yes" } else { "❌ No" },
-            if ctx.has_real_constraints { "✅ Yes" } else { "❌ No" },
+            if ctx.has_real_constraints {
+                "✅ Yes"
+            } else {
+                "❌ No"
+            },
         ));
 
         // ── Environment ──────────────────────────────────────────────────────
         md.push_str("---\n\n## Environment\n\n");
-        md.push_str(&format!("| Field | Value |\n|---|---|\n"));
+        md.push_str(&"| Field | Value |\n|---|---|\n".to_string());
         md.push_str(&format!("| OS | {} |\n", ctx.os));
         md.push_str(&format!("| Architecture | {} |\n", ctx.arch));
         md.push_str(&format!("| Backend kind | `{}` |\n", ctx.backend_kind));
-        md.push_str(&format!("| Proof system | `{}` |\n\n", ctx.proof_system_kind));
+        md.push_str(&format!(
+            "| Proof system | `{}` |\n\n",
+            ctx.proof_system_kind
+        ));
 
         // ── Dataset summary ──────────────────────────────────────────────────
         md.push_str("---\n\n## Dataset\n\n");
@@ -445,18 +466,49 @@ impl ReportGenerator {
                     md.push_str(&format!("**Description:** {}\n\n", r.scenario.description));
                 }
                 md.push_str(&format!("```sql\n{}\n```\n\n", r.scenario.sql.trim()));
-                md.push_str(&format!("| Metric | Value |\n|---|---|\n"));
-                md.push_str(&format!("| Status | {} |\n", if r.success { "✅ passed" } else { "❌ failed" }));
+                md.push_str(&"| Metric | Value |\n|---|---|\n".to_string());
+                md.push_str(&format!(
+                    "| Status | {} |\n",
+                    if r.success {
+                        "✅ passed"
+                    } else {
+                        "❌ failed"
+                    }
+                ));
                 md.push_str(&format!("| Rows | {} |\n", r.metrics.row_count));
                 md.push_str(&format!("| Chunks | {} |\n", r.metrics.chunk_count));
-                md.push_str(&format!("| Dataset gen | {:.3} ms |\n", r.metrics.dataset_generation_us as f64 / 1000.0));
-                md.push_str(&format!("| Ingestion | {:.3} ms |\n", r.metrics.ingestion_us as f64 / 1000.0));
-                md.push_str(&format!("| Proof generation | {:.3} ms |\n", r.metrics.proof_generation_us as f64 / 1000.0));
-                md.push_str(&format!("| Verification | {:.3} ms |\n", r.metrics.verification_us as f64 / 1000.0));
-                md.push_str(&format!("| Total | {:.3} ms |\n", r.metrics.total_us as f64 / 1000.0));
-                md.push_str(&format!("| Proof size | {} bytes |\n", r.metrics.proof_size_bytes));
-                md.push_str(&format!("| VK size | {} bytes |\n", r.metrics.verification_key_size_bytes));
-                md.push_str(&format!("| Throughput | {:.0} rows/sec |\n", r.metrics.proving_throughput_rps()));
+                md.push_str(&format!(
+                    "| Dataset gen | {:.3} ms |\n",
+                    r.metrics.dataset_generation_us as f64 / 1000.0
+                ));
+                md.push_str(&format!(
+                    "| Ingestion | {:.3} ms |\n",
+                    r.metrics.ingestion_us as f64 / 1000.0
+                ));
+                md.push_str(&format!(
+                    "| Proof generation | {:.3} ms |\n",
+                    r.metrics.proof_generation_us as f64 / 1000.0
+                ));
+                md.push_str(&format!(
+                    "| Verification | {:.3} ms |\n",
+                    r.metrics.verification_us as f64 / 1000.0
+                ));
+                md.push_str(&format!(
+                    "| Total | {:.3} ms |\n",
+                    r.metrics.total_us as f64 / 1000.0
+                ));
+                md.push_str(&format!(
+                    "| Proof size | {} bytes |\n",
+                    r.metrics.proof_size_bytes
+                ));
+                md.push_str(&format!(
+                    "| VK size | {} bytes |\n",
+                    r.metrics.verification_key_size_bytes
+                ));
+                md.push_str(&format!(
+                    "| Throughput | {:.0} rows/sec |\n",
+                    r.metrics.proving_throughput_rps()
+                ));
                 md.push_str(&format!("| Quality | {} |\n", r.metrics.quality.overall));
                 if let Some(ref err) = r.error {
                     md.push_str(&format!("| Error | `{}` |\n", err));
@@ -471,25 +523,51 @@ impl ReportGenerator {
         md.push_str(&format!("| Backend name | {} |\n", ctx.backend_name));
         md.push_str(&format!("| Backend kind | `{}` |\n", ctx.backend_kind));
         md.push_str(&format!("| Proof system | `{}` |\n", ctx.proof_system_kind));
-        md.push_str(&format!("| Zero-knowledge | {} |\n", if ctx.is_zero_knowledge { "✅ Yes" } else { "❌ No" }));
-        md.push_str(&format!("| Succinct verification | {} |\n", if ctx.is_succinct { "✅ Yes" } else { "❌ No" }));
-        md.push_str(&format!("| Real operator constraints | {} |\n\n", if ctx.has_real_constraints { "✅ Yes" } else { "❌ No" }));
+        md.push_str(&format!(
+            "| Zero-knowledge | {} |\n",
+            if ctx.is_zero_knowledge {
+                "✅ Yes"
+            } else {
+                "❌ No"
+            }
+        ));
+        md.push_str(&format!(
+            "| Succinct verification | {} |\n",
+            if ctx.is_succinct { "✅ Yes" } else { "❌ No" }
+        ));
+        md.push_str(&format!(
+            "| Real operator constraints | {} |\n\n",
+            if ctx.has_real_constraints {
+                "✅ Yes"
+            } else {
+                "❌ No"
+            }
+        ));
 
         // ── Observations ─────────────────────────────────────────────────────
         md.push_str("---\n\n## Observations\n\n");
         if results.iter().all(|r| r.success) {
             md.push_str("- All scenarios completed successfully.\n");
         } else {
-            let failed_names: Vec<_> = results.iter()
+            let failed_names: Vec<_> = results
+                .iter()
                 .filter(|r| !r.success)
                 .map(|r| format!("`{}`", r.scenario.name))
                 .collect();
-            md.push_str(&format!("- {} scenario(s) failed: {}\n", failed_names.len(), failed_names.join(", ")));
+            md.push_str(&format!(
+                "- {} scenario(s) failed: {}\n",
+                failed_names.len(),
+                failed_names.join(", ")
+            ));
         }
 
         if !results.is_empty() {
             // Find slowest
-            if let Some(slowest) = results.iter().filter(|r| r.success).max_by_key(|r| r.metrics.proof_generation_us) {
+            if let Some(slowest) = results
+                .iter()
+                .filter(|r| r.success)
+                .max_by_key(|r| r.metrics.proof_generation_us)
+            {
                 md.push_str(&format!(
                     "- Slowest proof generation: `{}` at {:.2} ms\n",
                     slowest.scenario.name,
@@ -497,19 +575,23 @@ impl ReportGenerator {
                 ));
             }
             // Find largest proof
-            if let Some(largest) = results.iter().filter(|r| r.success).max_by_key(|r| r.metrics.proof_size_bytes) {
+            if let Some(largest) = results
+                .iter()
+                .filter(|r| r.success)
+                .max_by_key(|r| r.metrics.proof_size_bytes)
+            {
                 md.push_str(&format!(
                     "- Largest proof: `{}` at {} bytes\n",
-                    largest.scenario.name,
-                    largest.metrics.proof_size_bytes
+                    largest.scenario.name, largest.metrics.proof_size_bytes
                 ));
             }
         }
 
         let quality_note = match ctx.backend_kind.as_str() {
             "mock" => "⚠️ **All metrics are PLACEHOLDER quality** — from mock backend, not suitable for research comparison.",
-            "constraint_checked" => "⚠️ **Proof metrics are NOT from a SNARK** — hash-chain audit backend. Timings reflect constraint validation + hashing, not polynomial proving.",
-            _ => "See metric quality flags in the results table.",
+            "constraint_checked" => "⚠️ **Proof metrics are ESTIMATED quality** — hash-chain audit backend. Timings reflect constraint validation + hashing, NOT polynomial proving. Results are not directly comparable with SNARK backends.",
+            "plonky2" => "✅ **Proof metrics are REAL quality** — Plonky2 FRI SNARK, fully wired. Suitable for research comparison.",
+            _ => "⚠️ See metric quality flags in the results table — some backends may be stubs.",
         };
         md.push_str(&format!("\n{}\n\n", quality_note));
 
@@ -524,7 +606,10 @@ impl ReportGenerator {
         md.push_str("---\n\n## Reproducibility\n\n");
         md.push_str("To reproduce this benchmark:\n\n");
         md.push_str("```bash\n");
-        md.push_str(&format!("cargo run --release -- bench suite --backend {} --rows 1000\n", ctx.backend_kind));
+        md.push_str(&format!(
+            "cargo run --release -- bench suite --backend {} --rows 1000\n",
+            ctx.backend_kind
+        ));
         md.push_str("```\n\n");
         md.push_str("To reuse the same benchmark pack with another algorithm, copy:\n\n");
         md.push_str("```\nbenchmark_pack/dataset/*\nbenchmark_pack/usecases/*\nbenchmark_pack/metrics/*\nbenchmark_pack/reports/*\n```\n\n");
@@ -726,7 +811,7 @@ fn snapshot_manifest_json(row_counts: &CanonicalRowCounts) -> Result<String, Exp
                 "dataset_name": "benchmark_transactions",
                 "row_count": row_counts.transactions,
                 "chunk_size": 256,
-                "chunk_count": (row_counts.transactions + 255) / 256,
+                "chunk_count": row_counts.transactions.div_ceil(256),
                 "encoding": "blake3_hash_chain",
                 "commitment_scheme": "blake3_merkle",
                 "status": "active",
@@ -737,7 +822,7 @@ fn snapshot_manifest_json(row_counts: &CanonicalRowCounts) -> Result<String, Exp
                 "dataset_name": "benchmark_employees",
                 "row_count": row_counts.employees,
                 "chunk_size": 64,
-                "chunk_count": (row_counts.employees + 63) / 64,
+                "chunk_count": row_counts.employees.div_ceil(64),
                 "encoding": "blake3_hash_chain",
                 "commitment_scheme": "blake3_merkle",
                 "status": "active",
@@ -756,9 +841,14 @@ fn transactions_csv(row_count: usize) -> String {
         let v = &row.values;
         csv.push_str(&format!(
             "{},{},{},{},{},{},{},{}\n",
-            v[0], v[1], v[2],
-            json_str(&v[3]), json_str(&v[4]),
-            v[5], v[6], v[7]
+            v[0],
+            v[1],
+            v[2],
+            json_str(&v[3]),
+            json_str(&v[4]),
+            v[5],
+            v[6],
+            v[7]
         ));
     }
     csv
@@ -766,12 +856,18 @@ fn transactions_csv(row_count: usize) -> String {
 
 fn employees_csv(row_count: usize) -> String {
     let rows = generate_employees(row_count);
-    let mut csv = String::from("employee_id,department,office,salary,manager_id,performance_score\n");
+    let mut csv =
+        String::from("employee_id,department,office,salary,manager_id,performance_score\n");
     for row in &rows {
         let v = &row.values;
         csv.push_str(&format!(
             "{},{},{},{},{},{}\n",
-            v[0], json_str(&v[1]), json_str(&v[2]), v[3], v[4], v[5]
+            v[0],
+            json_str(&v[1]),
+            json_str(&v[2]),
+            v[3],
+            v[4],
+            v[5]
         ));
     }
     csv
@@ -1732,4 +1828,3 @@ See the zkDB project README or open an issue for questions about
 benchmark methodology or pack format.
 "#
 }
-

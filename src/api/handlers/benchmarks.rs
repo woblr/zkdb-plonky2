@@ -6,16 +6,17 @@ use axum::{
 };
 
 use crate::api::dto::benchmark::{
-    BenchmarkResultResponse, BenchmarkSuiteResponse, CompareBenchmarksRequest,
+    parse_backend_kind, BenchmarkResultResponse, BenchmarkSuiteResponse, CompareBenchmarksRequest,
     RunBenchmarkRequest, RunSuiteRequest,
 };
-use crate::api::error::ApiResult;
+use crate::api::error::{ApiError, ApiResult};
 use crate::api::state::AppState;
+use crate::backend::backend_for_kind;
 use crate::benchmarks::cases::{extended_suite, standard_suite};
 use crate::benchmarks::compare::BenchmarkComparison;
 use crate::benchmarks::runner::BenchmarkRunner;
 use crate::benchmarks::storage::BenchmarkStore;
-use crate::benchmarks::types::BackendKind;
+use crate::types::ZkDbError;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /v1/benchmarks/run
@@ -26,9 +27,17 @@ pub async fn run_benchmark(
     State(state): State<AppState>,
     Json(req): Json<RunBenchmarkRequest>,
 ) -> ApiResult<Json<BenchmarkResultResponse>> {
-    let scenario = req.into_scenario();
+    let scenario = req.into_scenario().map_err(ApiError::from)?;
 
-    let runner = BenchmarkRunner::in_memory(state.backend.clone());
+    // Use the backend explicitly requested in the scenario, not the server's default backend.
+    // This ensures metric quality flags, proof system kind, and timings match the requested backend.
+    let backend = backend_for_kind(&scenario.backend).ok_or_else(|| {
+        ApiError(ZkDbError::Schema(format!(
+            "backend '{}' is not yet wired for proving",
+            scenario.backend
+        )))
+    })?;
+    let runner = BenchmarkRunner::in_memory(backend);
     let result = runner.run(&scenario).await;
 
     result.print_summary();
@@ -50,20 +59,23 @@ pub async fn run_suite(
     State(state): State<AppState>,
     Json(req): Json<RunSuiteRequest>,
 ) -> ApiResult<Json<BenchmarkSuiteResponse>> {
-    let backend = match req.backend.as_deref() {
-        Some("plonky2") => BackendKind::Plonky2,
-        Some("plonky3") => BackendKind::Plonky3,
-        Some("halo2") => BackendKind::Halo2,
-        _ => BackendKind::Mock,
-    };
+    let backend_kind = parse_backend_kind(&req.backend).map_err(ApiError::from)?;
+
+    // Use the backend explicitly requested, not the server's default.
+    let backend = backend_for_kind(&backend_kind).ok_or_else(|| {
+        ApiError(ZkDbError::Schema(format!(
+            "backend '{}' is not yet wired for proving",
+            backend_kind
+        )))
+    })?;
 
     let scenarios = if req.extended {
-        extended_suite(req.row_count, backend)
+        extended_suite(req.row_count, backend_kind)
     } else {
-        standard_suite(req.row_count, backend)
+        standard_suite(req.row_count, backend_kind)
     };
 
-    let runner = BenchmarkRunner::in_memory(state.backend.clone());
+    let runner = BenchmarkRunner::in_memory(backend);
     let results = runner.run_suite(&scenarios).await;
 
     let total_scenarios = results.len();
@@ -119,9 +131,7 @@ pub async fn list_benchmarks() -> ApiResult<Json<serde_json::Value>> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Get a stored benchmark result by run ID.
-pub async fn get_benchmark(
-    Path(run_id): Path<String>,
-) -> ApiResult<Json<BenchmarkResultResponse>> {
+pub async fn get_benchmark(Path(run_id): Path<String>) -> ApiResult<Json<BenchmarkResultResponse>> {
     let store = BenchmarkStore::default_location()
         .map_err(|e| crate::types::ZkDbError::Internal(e.to_string()))?;
 
@@ -150,12 +160,8 @@ pub async fn compare_benchmarks(
         .load_suite(&req.run_id_b)
         .map_err(|e| crate::types::ZkDbError::Internal(e.to_string()))?;
 
-    let comparison = BenchmarkComparison::compare(
-        &req.run_id_a,
-        &req.run_id_b,
-        &results_a,
-        &results_b,
-    );
+    let comparison =
+        BenchmarkComparison::compare(&req.run_id_a, &req.run_id_b, &results_a, &results_b);
 
     comparison.print();
 
@@ -175,8 +181,7 @@ pub async fn export_benchmarks() -> ApiResult<Json<serde_json::Value>> {
         .export_all_json()
         .map_err(|e| crate::types::ZkDbError::Internal(e.to_string()))?;
 
-    let value: serde_json::Value = serde_json::from_str(&json_str)
-        .unwrap_or(serde_json::json!([]));
+    let value: serde_json::Value = serde_json::from_str(&json_str).unwrap_or(serde_json::json!([]));
 
     Ok(Json(value))
 }

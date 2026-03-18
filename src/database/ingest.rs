@@ -89,7 +89,11 @@ impl IngestPipeline {
         Self::new(Arc::new(DefaultRowEncoder), chunk_store)
     }
 
-    pub async fn run(&self, request: IngestRequest, schema: &DatasetSchema) -> ZkResult<IngestResult> {
+    pub async fn run(
+        &self,
+        request: IngestRequest,
+        schema: &DatasetSchema,
+    ) -> ZkResult<IngestResult> {
         let chunk_size = request.chunk_size.unwrap_or(self.default_chunk_size);
 
         // 1. Encode all rows canonically.

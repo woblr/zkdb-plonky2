@@ -56,13 +56,19 @@ pub struct BackendCapabilities {
 impl BackendCapabilities {
     fn all_operators() -> Vec<String> {
         vec![
-            "table_scan".into(), "filter".into(), "projection".into(),
-            "aggregate".into(), "group_by".into(), "sort".into(),
-            "limit".into(), "join".into(),
+            "table_scan".into(),
+            "filter".into(),
+            "projection".into(),
+            "aggregate".into(),
+            "group_by".into(),
+            "sort".into(),
+            "limit".into(),
+            "join".into(),
         ]
     }
 
-    /// MockBackend: no real logic, no proof system.
+    /// Capabilities for a "no-proof" sentinel (used internally for error results).
+    /// Not registered in the production backend registry.
     pub fn mock() -> Self {
         Self {
             is_mock: true,
@@ -84,11 +90,11 @@ impl BackendCapabilities {
         Self {
             is_mock: false,
             has_real_constraints: true,
-            has_zero_knowledge: false,           // audit log, not zk
-            has_succinct_verification: false,    // O(columns × rows)
-            has_polynomial_commitments: false,   // Blake3, not polynomial
-            has_real_proof_system: false,        // NOT a SNARK
-            supports_recursion: true,            // hash-chain fold is supported
+            has_zero_knowledge: false,         // audit log, not zk
+            has_succinct_verification: false,  // O(columns × rows)
+            has_polynomial_commitments: false, // Blake3, not polynomial
+            has_real_proof_system: false,      // NOT a SNARK
+            supports_recursion: true,          // hash-chain fold is supported
             custom_gates: true,
             max_constraints: Some(1 << 20),
             supported_operators: Self::all_operators(),
@@ -96,19 +102,28 @@ impl BackendCapabilities {
         }
     }
 
-    /// Plonky2Backend stub: real zk SNARK, not yet wired.
-    pub fn plonky2_stub() -> Self {
+    /// Plonky2Backend: real FRI-based SNARK, fully wired.
+    pub fn plonky2_live() -> Self {
         Self {
             is_mock: false,
             has_real_constraints: true,
             has_zero_knowledge: true,
             has_succinct_verification: true,
-            has_polynomial_commitments: true,    // FRI
+            has_polynomial_commitments: true, // FRI
             has_real_proof_system: true,
-            supports_recursion: true,
+            supports_recursion: false, // fold() not yet implemented
             custom_gates: true,
             max_constraints: Some(1 << 22),
-            supported_operators: Self::all_operators(),
+            supported_operators: vec![
+                "count".into(),
+                "sum".into(),
+                "avg".into(),
+                "filter".into(),
+                "order_by_asc".into(),
+                "order_by_desc".into(),
+                "group_by".into(),
+                "inner_join".into(),
+            ],
             proof_system: ProofSystemKind::Plonky2Snark,
         }
     }
@@ -129,13 +144,15 @@ pub struct BackendDescriptor {
 }
 
 impl BackendDescriptor {
+    /// Sentinel descriptor — not registered in production, kept for internal error tagging.
     pub fn mock() -> Self {
         Self {
             kind: BackendKind::Mock,
             tag: BackendTag::Mock,
-            name: "MockBackend".into(),
-            version: "0.1.0".into(),
-            description: "Deterministic Blake3-stub for testing. No real constraints or proof system.".into(),
+            name: "NoProofSentinel".into(),
+            version: "0.0.0".into(),
+            description: "Internal sentinel — no proof system. Never registered in production."
+                .into(),
             capabilities: BackendCapabilities::mock(),
         }
     }
@@ -150,23 +167,25 @@ impl BackendDescriptor {
                 "Real operator constraint validation (sort, group_by, join, filter). ",
                 "Produces hash-chain audit artifacts. ",
                 "NOT zero-knowledge. NOT succinct. NOT a SNARK."
-            ).into(),
+            )
+            .into(),
             capabilities: BackendCapabilities::constraint_checked(),
         }
     }
 
-    pub fn plonky2_stub() -> Self {
+    pub fn plonky2_live() -> Self {
         Self {
             kind: BackendKind::Plonky2,
             tag: BackendTag::Plonky2,
             name: "Plonky2Backend".into(),
-            version: "0.0.0-stub".into(),
+            version: "0.3.0-live".into(),
             description: concat!(
                 "Plonky2 FRI-based SNARK. Zero-knowledge. Succinct. ",
-                "STUB — proof generation path not yet wired. ",
-                "prove() returns an error."
-            ).into(),
-            capabilities: BackendCapabilities::plonky2_stub(),
+                "Fully wired: prove() generates real Goldilocks-field FRI proofs; ",
+                "verify() performs real proof verification with PI cross-checks."
+            )
+            .into(),
+            capabilities: BackendCapabilities::plonky2_live(),
         }
     }
 }
@@ -188,11 +207,7 @@ impl BackendRegistry {
         }
     }
 
-    pub fn register(
-        &mut self,
-        descriptor: BackendDescriptor,
-        backend: Arc<dyn ProvingBackend>,
-    ) {
+    pub fn register(&mut self, descriptor: BackendDescriptor, backend: Arc<dyn ProvingBackend>) {
         let kind = descriptor.kind.clone();
         self.descriptors.insert(kind.clone(), descriptor);
         self.backends.insert(kind, backend);
@@ -214,20 +229,52 @@ impl BackendRegistry {
         self.descriptors.values().collect()
     }
 
-    pub fn len(&self) -> usize { self.backends.len() }
-    pub fn is_empty(&self) -> bool { self.backends.is_empty() }
+    pub fn len(&self) -> usize {
+        self.backends.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.backends.is_empty()
+    }
 }
 
 impl Default for BackendRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-/// Create a registry pre-populated with mock, constraint_checked, and plonky2_stub.
+/// Create a registry pre-populated with constraint_checked and plonky2_live.
+///
+/// MockBackend has been removed. "mock" is no longer a valid backend for API or
+/// benchmark requests. Use "constraint_checked" for lightweight integration tests
+/// and "plonky2" for production ZK proving.
 pub fn default_registry() -> BackendRegistry {
-    use crate::backend::{ConstraintCheckedBackend, MockBackend, Plonky2Backend};
+    use crate::backend::{ConstraintCheckedBackend, Plonky2Backend};
     let mut registry = BackendRegistry::new();
-    registry.register(BackendDescriptor::mock(), Arc::new(MockBackend::default()));
-    registry.register(BackendDescriptor::constraint_checked(), Arc::new(ConstraintCheckedBackend::default()));
-    registry.register(BackendDescriptor::plonky2_stub(), Arc::new(Plonky2Backend::new_stub()));
+    registry.register(
+        BackendDescriptor::constraint_checked(),
+        Arc::new(ConstraintCheckedBackend::default()),
+    );
+    registry.register(
+        BackendDescriptor::plonky2_live(),
+        Arc::new(Plonky2Backend::new()),
+    );
     registry
+}
+
+/// Instantiate a concrete backend from a `BackendKind`.
+///
+/// Returns `None` only for variants that are not yet implemented (Plonky3, Halo2).
+pub fn backend_for_kind(
+    kind: &crate::benchmarks::types::BackendKind,
+) -> Option<Arc<dyn ProvingBackend>> {
+    use crate::backend::{ConstraintCheckedBackend, Plonky2Backend};
+    use crate::benchmarks::types::BackendKind;
+    match kind {
+        BackendKind::ConstraintChecked | BackendKind::Baseline => {
+            Some(Arc::new(ConstraintCheckedBackend::default()))
+        }
+        BackendKind::Plonky2 => Some(Arc::new(Plonky2Backend::new())),
+        _ => None,
+    }
 }

@@ -51,22 +51,22 @@ pub enum BackendKind {
     Baseline,
     /// Real constraints + hash-chain audit. NOT zero-knowledge. NOT succinct.
     ConstraintChecked,
-    /// Plonky2 FRI SNARK. Zero-knowledge. Succinct. (stub — not yet wired)
+    /// Plonky2 FRI SNARK. Zero-knowledge. Succinct. Fully wired.
     Plonky2,
-    /// Plonky3 (stub — not yet wired)
+    /// Plonky3 (not yet wired)
     Plonky3,
-    /// Halo2 (stub — not yet wired)
+    /// Halo2 (not yet wired)
     Halo2,
 }
 
 impl From<&BackendTag> for BackendKind {
     fn from(tag: &BackendTag) -> Self {
         match tag {
-            BackendTag::Mock              => BackendKind::Mock,
-            BackendTag::Baseline          => BackendKind::ConstraintChecked,
+            BackendTag::Mock => BackendKind::Mock,
+            BackendTag::Baseline => BackendKind::ConstraintChecked,
             BackendTag::ConstraintChecked => BackendKind::ConstraintChecked,
-            BackendTag::Plonky2           => BackendKind::Plonky2,
-            BackendTag::Plonky3           => BackendKind::Plonky3,
+            BackendTag::Plonky2 => BackendKind::Plonky2,
+            BackendTag::Plonky3 => BackendKind::Plonky3,
         }
     }
 }
@@ -74,12 +74,12 @@ impl From<&BackendTag> for BackendKind {
 impl fmt::Display for BackendKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BackendKind::Mock              => write!(f, "mock"),
-            BackendKind::Baseline          => write!(f, "constraint_checked"),
+            BackendKind::Mock => write!(f, "mock"),
+            BackendKind::Baseline => write!(f, "constraint_checked"),
             BackendKind::ConstraintChecked => write!(f, "constraint_checked"),
-            BackendKind::Plonky2           => write!(f, "plonky2"),
-            BackendKind::Plonky3           => write!(f, "plonky3"),
-            BackendKind::Halo2             => write!(f, "halo2"),
+            BackendKind::Plonky2 => write!(f, "plonky2"),
+            BackendKind::Plonky3 => write!(f, "plonky3"),
+            BackendKind::Halo2 => write!(f, "halo2"),
         }
     }
 }
@@ -156,11 +156,31 @@ impl MetricQualityFlags {
         }
     }
 
-    /// Derive from a `BackendKind` — mock is always placeholder.
+    /// Derive metric quality from backend kind.
+    ///
+    /// - `Mock` → Placeholder: Blake3 hash stubs, timings are not meaningful.
+    /// - `ConstraintChecked` / `Baseline` → Estimated: real constraint validation + hashing,
+    ///   but NOT a SNARK — proof timings are not comparable with polynomial proving.
+    /// - `Plonky2` → Real: genuine FRI-based SNARK, timings are research-quality.
+    /// - `Plonky3` / `Halo2` → Estimated: stubs not yet fully wired.
     pub fn from_backend(kind: &BackendKind) -> Self {
         match kind {
             BackendKind::Mock => Self::all_placeholder(),
-            _ => Self::all_real(),
+            BackendKind::ConstraintChecked | BackendKind::Baseline => Self {
+                proof_generation_time: MetricQuality::Estimated,
+                verification_time: MetricQuality::Estimated,
+                proof_size: MetricQuality::Estimated,
+                vk_size: MetricQuality::Estimated,
+                overall: MetricQuality::Estimated,
+            },
+            BackendKind::Plonky2 => Self::all_real(),
+            _ => Self {
+                proof_generation_time: MetricQuality::Estimated,
+                verification_time: MetricQuality::Estimated,
+                proof_size: MetricQuality::Estimated,
+                vk_size: MetricQuality::Estimated,
+                overall: MetricQuality::Estimated,
+            },
         }
     }
 }
@@ -184,15 +204,19 @@ pub enum QueryFamily {
 
 impl fmt::Display for QueryFamily {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", match self {
-            QueryFamily::Scan => "scan",
-            QueryFamily::Filter => "filter",
-            QueryFamily::Aggregate => "aggregate",
-            QueryFamily::GroupBy => "group_by",
-            QueryFamily::Sort => "sort",
-            QueryFamily::Join => "join",
-            QueryFamily::Mixed => "mixed",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                QueryFamily::Scan => "scan",
+                QueryFamily::Filter => "filter",
+                QueryFamily::Aggregate => "aggregate",
+                QueryFamily::GroupBy => "group_by",
+                QueryFamily::Sort => "sort",
+                QueryFamily::Join => "join",
+                QueryFamily::Mixed => "mixed",
+            }
+        )
     }
 }
 
@@ -357,17 +381,57 @@ impl BenchmarkMetrics {
 
     pub fn print(&self) {
         println!("║  ── Timing ──");
-        println!("║    Dataset generation:  {:>10} µs ({:.3} ms)", self.dataset_generation_us, self.dataset_generation_us as f64 / 1000.0);
-        println!("║    Ingestion:           {:>10} µs ({:.3} ms)", self.ingestion_us, self.ingestion_us as f64 / 1000.0);
-        println!("║    Snapshot creation:   {:>10} µs ({:.3} ms)", self.snapshot_creation_us, self.snapshot_creation_us as f64 / 1000.0);
-        println!("║    Snapshot activation: {:>10} µs ({:.3} ms)", self.snapshot_activation_us, self.snapshot_activation_us as f64 / 1000.0);
-        println!("║    Query planning:      {:>10} µs ({:.3} ms)", self.query_planning_us, self.query_planning_us as f64 / 1000.0);
-        println!("║    Proof generation:    {:>10} µs ({:.3} ms) [{}]", self.proof_generation_us, self.proof_generation_us as f64 / 1000.0, self.quality.proof_generation_time);
-        println!("║    Verification:        {:>10} µs ({:.3} ms) [{}]", self.verification_us, self.verification_us as f64 / 1000.0, self.quality.verification_time);
-        println!("║    TOTAL:               {:>10} µs ({:.3} ms)", self.total_us, self.total_us as f64 / 1000.0);
+        println!(
+            "║    Dataset generation:  {:>10} µs ({:.3} ms)",
+            self.dataset_generation_us,
+            self.dataset_generation_us as f64 / 1000.0
+        );
+        println!(
+            "║    Ingestion:           {:>10} µs ({:.3} ms)",
+            self.ingestion_us,
+            self.ingestion_us as f64 / 1000.0
+        );
+        println!(
+            "║    Snapshot creation:   {:>10} µs ({:.3} ms)",
+            self.snapshot_creation_us,
+            self.snapshot_creation_us as f64 / 1000.0
+        );
+        println!(
+            "║    Snapshot activation: {:>10} µs ({:.3} ms)",
+            self.snapshot_activation_us,
+            self.snapshot_activation_us as f64 / 1000.0
+        );
+        println!(
+            "║    Query planning:      {:>10} µs ({:.3} ms)",
+            self.query_planning_us,
+            self.query_planning_us as f64 / 1000.0
+        );
+        println!(
+            "║    Proof generation:    {:>10} µs ({:.3} ms) [{}]",
+            self.proof_generation_us,
+            self.proof_generation_us as f64 / 1000.0,
+            self.quality.proof_generation_time
+        );
+        println!(
+            "║    Verification:        {:>10} µs ({:.3} ms) [{}]",
+            self.verification_us,
+            self.verification_us as f64 / 1000.0,
+            self.quality.verification_time
+        );
+        println!(
+            "║    TOTAL:               {:>10} µs ({:.3} ms)",
+            self.total_us,
+            self.total_us as f64 / 1000.0
+        );
         println!("║  ── Size ──");
-        println!("║    Proof size:          {:>10} bytes [{}]", self.proof_size_bytes, self.quality.proof_size);
-        println!("║    VK size:             {:>10} bytes [{}]", self.verification_key_size_bytes, self.quality.vk_size);
+        println!(
+            "║    Proof size:          {:>10} bytes [{}]",
+            self.proof_size_bytes, self.quality.proof_size
+        );
+        println!(
+            "║    VK size:             {:>10} bytes [{}]",
+            self.verification_key_size_bytes, self.quality.vk_size
+        );
         println!("║  ── Counts ──");
         println!("║    Rows:                {:>10}", self.row_count);
         println!("║    Chunks:              {:>10}", self.chunk_count);
@@ -407,8 +471,16 @@ impl BenchmarkResult {
         println!("║  Benchmark: {:<48} ║", self.scenario.name);
         println!("╠══════════════════════════════════════════════════════════════╣");
         println!("║  Run ID:      {}", self.run_id);
-        println!("║  Backend:     {} (quality: {})", self.scenario.backend, self.metrics.quality.overall);
-        println!("║  Family:      {} / {} / {}", self.scenario.query_family, self.scenario.operator_family, self.scenario.complexity_class);
+        println!(
+            "║  Backend:     {} (quality: {})",
+            self.scenario.backend, self.metrics.quality.overall
+        );
+        println!(
+            "║  Family:      {} / {} / {}",
+            self.scenario.query_family,
+            self.scenario.operator_family,
+            self.scenario.complexity_class
+        );
         println!("║  Rows:        {}", self.scenario.row_count);
         println!("║  Chunk size:  {}", self.scenario.chunk_size);
         println!("║  SQL:         {}", truncate_sql(&self.scenario.sql, 50));

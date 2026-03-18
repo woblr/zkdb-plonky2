@@ -17,7 +17,7 @@
 //! ├───────────────────────────────┼─────────────────────────────┤
 //! │  Circuit layer (circuit/)     │  Backend layer (backend/)    │
 //! │  Operator circuits            │  ProvingBackend trait        │
-//! │  Witness generation           │  MockBackend                 │
+//! │  Witness generation           │  ConstraintCheckedBackend    │
 //! ├───────────────────────────────┴─────────────────────────────┤
 //! │  Gates (gates/)    Field (field.rs)    Crypto (crypto/)      │
 //! │  Gadget interfaces             Field element arithmetic       │

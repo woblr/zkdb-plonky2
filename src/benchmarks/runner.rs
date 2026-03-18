@@ -13,7 +13,9 @@
 use crate::backend::traits::ProvingBackend;
 use crate::benchmarks::dataset::{generate_transactions, transactions_schema};
 use crate::benchmarks::metrics::Stopwatch;
-use crate::benchmarks::types::{BenchmarkMetrics, BenchmarkResult, BenchmarkRunId, BenchmarkScenario, MetricQualityFlags};
+use crate::benchmarks::types::{
+    BenchmarkMetrics, BenchmarkResult, BenchmarkRunId, BenchmarkScenario, MetricQualityFlags,
+};
 use crate::commitment::service::CommitmentService;
 use crate::database::service::DatasetService;
 use crate::database::storage::{ChunkStore, DatasetRepository, SnapshotRepository};
@@ -75,10 +77,7 @@ impl BenchmarkRunner {
         ));
 
         let policy_engine = Arc::new(PolicyEngine::new());
-        let query_service = Arc::new(QueryService::new(
-            dataset_service.clone(),
-            policy_engine,
-        ));
+        let query_service = Arc::new(QueryService::new(dataset_service.clone(), policy_engine));
 
         let proof_store = Arc::new(InMemoryProofStore::new());
         let prover = Arc::new(Prover::new(
@@ -113,8 +112,13 @@ impl BenchmarkRunner {
 
         let result = self
             .run_inner(
-                scenario, &mut sw, &mut metrics,
-                &mut dataset_id, &mut snapshot_id, &mut query_id, &mut proof_id,
+                scenario,
+                &mut sw,
+                &mut metrics,
+                &mut dataset_id,
+                &mut snapshot_id,
+                &mut query_id,
+                &mut proof_id,
             )
             .await;
 

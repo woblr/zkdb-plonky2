@@ -1,16 +1,22 @@
 //! Axum router assembly.
 
-use axum::{routing::{get, post}, Router};
 use crate::api::{
     handlers::{
         benchmarks::{
-            compare_benchmarks, export_benchmarks, get_benchmark, list_benchmarks,
-            run_benchmark, run_suite,
+            compare_benchmarks, export_benchmarks, get_benchmark, list_benchmarks, run_benchmark,
+            run_suite,
         },
-        datasets::{activate_snapshot, create_dataset, create_snapshot, get_dataset, ingest_rows, list_datasets, list_snapshots},
+        datasets::{
+            activate_snapshot, create_dataset, create_snapshot, get_dataset, ingest_rows,
+            list_datasets, list_snapshots,
+        },
         queries::{get_job, get_proof, get_query_result, submit_query, verify_proof},
     },
     state::AppState,
+};
+use axum::{
+    routing::{get, post},
+    Router,
 };
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
@@ -20,7 +26,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/datasets", post(create_dataset).get(list_datasets))
         .route("/v1/datasets/:dataset_id", get(get_dataset))
         .route("/v1/datasets/:dataset_id/ingest", post(ingest_rows))
-        .route("/v1/datasets/:dataset_id/snapshots", post(create_snapshot).get(list_snapshots))
+        .route(
+            "/v1/datasets/:dataset_id/snapshots",
+            post(create_snapshot).get(list_snapshots),
+        )
         .route(
             "/v1/datasets/:dataset_id/snapshots/:snapshot_id/activate",
             post(activate_snapshot),

@@ -36,7 +36,7 @@ impl BenchmarkStore {
         let filename = format!("{}.json", result.run_id);
         let path = self.base_dir.join(&filename);
         let json = serde_json::to_string_pretty(result)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(|e| std::io::Error::other(e))?;
         fs::write(&path, json)?;
         Ok(())
     }
@@ -53,7 +53,7 @@ impl BenchmarkStore {
             let filename = format!("{}.json", result.run_id);
             let path = suite_dir.join(&filename);
             let json = serde_json::to_string_pretty(result)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                .map_err(|e| std::io::Error::other(e))?;
             fs::write(&path, json)?;
             run_ids.push(result.run_id.to_string());
         }
@@ -67,7 +67,7 @@ impl BenchmarkStore {
             successful: results.iter().filter(|r| r.success).count(),
         };
         let manifest_json = serde_json::to_string_pretty(&manifest)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(|e| std::io::Error::other(e))?;
         fs::write(suite_dir.join("manifest.json"), manifest_json)?;
 
         Ok(suite_id)
@@ -80,7 +80,7 @@ impl BenchmarkStore {
         if path.exists() {
             let json = fs::read_to_string(&path)?;
             let result: BenchmarkResult = serde_json::from_str(&json)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                .map_err(|e| std::io::Error::other(e))?;
             return Ok(result);
         }
 
@@ -92,7 +92,7 @@ impl BenchmarkStore {
                 if candidate.exists() {
                     let json = fs::read_to_string(&candidate)?;
                     let result: BenchmarkResult = serde_json::from_str(&json)
-                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+                        .map_err(|e| std::io::Error::other(e))?;
                     return Ok(result);
                 }
             }
@@ -169,14 +169,13 @@ impl BenchmarkStore {
         for entry in fs::read_dir(&suite_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map(|e| e == "json").unwrap_or(false) {
-                if path.file_stem().map(|s| s != "manifest").unwrap_or(false) {
+            if path.extension().map(|e| e == "json").unwrap_or(false)
+                && path.file_stem().map(|s| s != "manifest").unwrap_or(false) {
                     let json = fs::read_to_string(&path)?;
                     if let Ok(result) = serde_json::from_str::<BenchmarkResult>(&json) {
                         results.push(result);
                     }
                 }
-            }
         }
         Ok(results)
     }
@@ -191,7 +190,7 @@ impl BenchmarkStore {
             }
         }
         serde_json::to_string_pretty(&results)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+            .map_err(|e| std::io::Error::other(e))
     }
 
     /// Get the base directory path.

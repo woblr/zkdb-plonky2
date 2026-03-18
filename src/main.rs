@@ -10,7 +10,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use zkdb_plonky2::{
     api::{build_router, AppState},
-    backend::MockBackend,
     benchmarks::{
         cases::{extended_suite, full_operator_suite, standard_suite},
         compare::BenchmarkComparison,
@@ -20,7 +19,9 @@ use zkdb_plonky2::{
         types::{BackendKind, BenchmarkScenario},
     },
     commitment::service::Blake3CommitmentService,
-    database::storage::{InMemoryChunkStore, InMemoryDatasetRepository, InMemorySnapshotRepository},
+    database::storage::{
+        InMemoryChunkStore, InMemoryDatasetRepository, InMemorySnapshotRepository,
+    },
     policy::engine::PolicyEngine,
 };
 
@@ -29,7 +30,10 @@ use zkdb_plonky2::{
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[derive(Parser)]
-#[command(name = "zkdb", about = "Zero-knowledge database with snapshot-based proving")]
+#[command(
+    name = "zkdb",
+    about = "Zero-knowledge database with snapshot-based proving"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -60,8 +64,8 @@ enum BenchAction {
         /// Number of rows.
         #[arg(short, long, default_value = "1000")]
         rows: usize,
-        /// Backend (mock, constraint_checked, plonky2).
-        #[arg(short, long, default_value = "mock")]
+        /// Backend (constraint_checked, plonky2).
+        #[arg(short, long, default_value = "constraint_checked")]
         backend: String,
         /// Chunk size.
         #[arg(short, long, default_value = "256")]
@@ -75,8 +79,8 @@ enum BenchAction {
         /// Number of rows per scenario.
         #[arg(short, long, default_value = "1000")]
         rows: usize,
-        /// Backend (mock, constraint_checked, plonky2).
-        #[arg(short, long, default_value = "mock")]
+        /// Backend (constraint_checked, plonky2).
+        #[arg(short, long, default_value = "constraint_checked")]
         backend: String,
         /// Run extended suite with heavier scenarios (more scenarios).
         #[arg(short = 'x', long)]
@@ -168,7 +172,11 @@ async fn run_server(bind: String) -> anyhow::Result<()> {
     let snapshot_repo = Arc::new(InMemorySnapshotRepository::new());
     let chunk_store = Arc::new(InMemoryChunkStore::new());
     let commitment_svc = Arc::new(Blake3CommitmentService);
-    let backend = Arc::new(MockBackend::default());
+    let backend_env = std::env::var("ZKDB_BACKEND").unwrap_or_else(|_| "plonky2".to_string());
+    let backend_kind = parse_backend(&backend_env);
+    let backend = make_backend(&backend_kind);
+
+    tracing::info!("Initializing API server with backend: {:?}", backend_kind);
     let policy_engine = PolicyEngine::new();
 
     let state = AppState::new(
@@ -264,7 +272,10 @@ async fn run_bench(action: BenchAction) -> anyhow::Result<()> {
             let fail = total - ok;
 
             println!("\n╔══════════════════════════════════════════════════════════════╗");
-            println!("║  Suite Summary: {} scenarios, {} passed, {} failed", total, ok, fail);
+            println!(
+                "║  Suite Summary: {} scenarios, {} passed, {} failed",
+                total, ok, fail
+            );
             println!("╚══════════════════════════════════════════════════════════════╝\n");
 
             for r in &results {
@@ -394,12 +405,26 @@ async fn run_bench(action: BenchAction) -> anyhow::Result<()> {
 }
 
 fn parse_backend(s: &str) -> BackendKind {
-    match s {
+    match s.trim() {
         "constraint_checked" | "baseline" | "real" => BackendKind::ConstraintChecked,
         "plonky2" => BackendKind::Plonky2,
         "plonky3" => BackendKind::Plonky3,
         "halo2" => BackendKind::Halo2,
-        _ => BackendKind::Mock,
+        "mock" => {
+            eprintln!(
+                "ERROR: 'mock' backend has been removed. \
+                 Use 'constraint_checked' for integration testing or 'plonky2' for production."
+            );
+            std::process::exit(1);
+        }
+        other => {
+            eprintln!(
+                "ERROR: unknown backend '{}'. \
+                 Valid values: constraint_checked, plonky2",
+                other
+            );
+            std::process::exit(1);
+        }
     }
 }
 
@@ -409,7 +434,10 @@ fn make_backend(kind: &BackendKind) -> Arc<dyn zkdb_plonky2::backend::ProvingBac
         BackendKind::ConstraintChecked | BackendKind::Baseline => {
             Arc::new(ConstraintCheckedBackend::default())
         }
-        BackendKind::Plonky2 => Arc::new(Plonky2Backend::new_stub()),
-        _ => Arc::new(MockBackend::default()),
+        BackendKind::Plonky2 => Arc::new(Plonky2Backend::new()),
+        other => {
+            eprintln!("ERROR: backend '{}' is not yet implemented.", other);
+            std::process::exit(1);
+        }
     }
 }

@@ -2,7 +2,6 @@
 //!
 //! Used for aggregate operators (SUM, COUNT, AVG) to prove correct accumulation.
 
-
 /// Running sum trace: for each row, track the partial accumulation.
 #[derive(Debug, Clone)]
 pub struct RunningSumTrace {

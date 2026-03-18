@@ -188,20 +188,20 @@ pub enum BackendTag {
     /// Real operator constraint validation + hash-chain audit log.
     /// NOT zero-knowledge. NOT succinct. NOT a SNARK.
     ConstraintChecked,
-    /// Plonky2 FRI-based SNARK. Zero-knowledge. Succinct. (stub — not yet wired)
+    /// Plonky2 FRI-based SNARK. Zero-knowledge. Succinct. Fully wired.
     Plonky2,
-    /// Plonky3 continuation of Plonky2. (stub — not yet wired)
+    /// Plonky3 continuation of Plonky2. (not yet implemented)
     Plonky3,
 }
 
 impl fmt::Display for BackendTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BackendTag::Mock              => write!(f, "mock"),
-            BackendTag::Baseline          => write!(f, "constraint_checked"),   // canonical
+            BackendTag::Mock => write!(f, "mock"),
+            BackendTag::Baseline => write!(f, "constraint_checked"), // canonical
             BackendTag::ConstraintChecked => write!(f, "constraint_checked"),
-            BackendTag::Plonky2           => write!(f, "plonky2"),
-            BackendTag::Plonky3           => write!(f, "plonky3"),
+            BackendTag::Plonky2 => write!(f, "plonky2"),
+            BackendTag::Plonky3 => write!(f, "plonky3"),
         }
     }
 }

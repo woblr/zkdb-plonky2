@@ -1,7 +1,7 @@
 //! Query and snapshot DTOs.
 
 use crate::database::snapshot::SnapshotRecord;
-use crate::types::{SnapshotStatus};
+use crate::types::SnapshotStatus;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
@@ -29,6 +29,8 @@ pub struct QueryResultResponse {
     pub result: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<crate::proof::artifacts::ProofCapabilities>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }

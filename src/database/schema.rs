@@ -109,7 +109,9 @@ impl DatasetSchema {
     /// Resolve column index by name (case-insensitive).
     pub fn column_index(&self, name: &str) -> Option<usize> {
         let lower = name.to_lowercase();
-        self.columns.iter().position(|c| c.name.to_lowercase() == lower)
+        self.columns
+            .iter()
+            .position(|c| c.name.to_lowercase() == lower)
     }
 
     /// Return column definition by name.
@@ -130,7 +132,9 @@ impl DatasetSchema {
 /// Validates a schema definition, returning descriptive errors.
 pub fn validate_schema(schema: &DatasetSchema) -> ZkResult<()> {
     if schema.columns.is_empty() {
-        return Err(ZkDbError::Schema("schema must have at least one column".into()));
+        return Err(ZkDbError::Schema(
+            "schema must have at least one column".into(),
+        ));
     }
 
     let mut names = HashSet::new();
@@ -140,7 +144,10 @@ pub fn validate_schema(schema: &DatasetSchema) -> ZkResult<()> {
             return Err(ZkDbError::Schema("column name cannot be empty".into()));
         }
         if !names.insert(name.clone()) {
-            return Err(ZkDbError::Schema(format!("duplicate column name: {}", name)));
+            return Err(ZkDbError::Schema(format!(
+                "duplicate column name: {}",
+                name
+            )));
         }
         // Validate decimal precision/scale
         if let ColumnType::Decimal { precision, scale } = &col.col_type {
@@ -193,7 +200,12 @@ mod tests {
             "test",
             vec![
                 ColumnSchema::new("id", ColumnType::U64),
-                ColumnSchema::new("name", ColumnType::Text { max_bytes: Some(128) }),
+                ColumnSchema::new(
+                    "name",
+                    ColumnType::Text {
+                        max_bytes: Some(128),
+                    },
+                ),
                 ColumnSchema::new("salary", ColumnType::I64).nullable(),
             ],
         )

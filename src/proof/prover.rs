@@ -6,7 +6,7 @@ use crate::database::storage::ChunkStore;
 use crate::proof::artifacts::{InMemoryProofStore, ProofArtifact};
 use crate::query::proof_plan::ProofPlan;
 use crate::query::service::NormalizedQuery;
-use crate::types::{ZkResult};
+use crate::types::ZkResult;
 use std::sync::Arc;
 
 pub struct Prover {
@@ -21,7 +21,11 @@ impl Prover {
         chunk_store: Arc<dyn ChunkStore>,
         proof_store: Arc<InMemoryProofStore>,
     ) -> Self {
-        Self { backend, chunk_store, proof_store }
+        Self {
+            backend,
+            chunk_store,
+            proof_store,
+        }
     }
 
     /// Full prove pipeline: witness → circuit → proof → store.
@@ -31,7 +35,10 @@ impl Prover {
         proof_plan: &ProofPlan,
     ) -> ZkResult<ProofArtifact> {
         // 1. Load snapshot chunks from store
-        let chunks = self.chunk_store.read_snapshot_chunks(&normalized.snapshot_id).await?;
+        let chunks = self
+            .chunk_store
+            .read_snapshot_chunks(&normalized.snapshot_id)
+            .await?;
 
         // 2. Build witness trace from chunks
         let witness = WitnessBuilder::build(

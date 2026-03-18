@@ -10,7 +10,7 @@
 //! - End-to-end proof pipeline with ConstraintCheckedBackend
 
 use std::sync::Arc;
-use zkdb_plonky2::backend::{ConstraintCheckedBackend, MockBackend};
+use zkdb_plonky2::backend::ConstraintCheckedBackend;
 use zkdb_plonky2::benchmarks::cases::{
     full_operator_suite, group_by_suite, join_suite, sort_suite, standard_suite,
 };
@@ -77,8 +77,14 @@ fn employees_dataset_salary_range() {
 #[test]
 fn employees_dataset_departments_are_valid() {
     let valid_depts = [
-        "engineering", "marketing", "sales", "finance",
-        "hr", "operations", "legal", "research",
+        "engineering",
+        "marketing",
+        "sales",
+        "finance",
+        "hr",
+        "operations",
+        "legal",
+        "research",
     ];
     let rows = generate_employees(500);
     for row in &rows {
@@ -129,7 +135,7 @@ fn group_by_count_two_groups() {
 
     assert_eq!(result.num_groups, 2);
     assert_eq!(result.group_keys, vec![100, 200]);
-    assert_eq!(result.group_sums, vec![30, 45]);  // 5+10+15, 20+25
+    assert_eq!(result.group_sums, vec![30, 45]); // 5+10+15, 20+25
     assert_eq!(result.group_counts, vec![3, 2]);
 }
 
@@ -144,7 +150,7 @@ fn group_by_unsorted_input_gets_sorted() {
     assert_eq!(result.num_groups, 3);
     // After sorting, groups should be 1, 2, 3
     assert_eq!(result.group_keys, vec![1, 2, 3]);
-    assert_eq!(result.group_sums, vec![20, 20, 60]);  // key1: 10+10, key2: 20, key3: 30+30
+    assert_eq!(result.group_sums, vec![20, 20, 60]); // key1: 10+10, key2: 20, key3: 30+30
     assert_eq!(result.group_counts, vec![2, 1, 2]);
 }
 
@@ -169,8 +175,14 @@ fn group_by_averages_are_correct() {
     let result = execute_group_by(&keys, &vals);
 
     assert_eq!(result.num_groups, 2);
-    assert!((result.group_averages[0] - 20.0).abs() < 1e-6, "group1 avg should be 20");
-    assert!((result.group_averages[1] - 40.0).abs() < 1e-6, "group2 avg should be 40");
+    assert!(
+        (result.group_averages[0] - 20.0).abs() < 1e-6,
+        "group1 avg should be 20"
+    );
+    assert!(
+        (result.group_averages[1] - 40.0).abs() < 1e-6,
+        "group2 avg should be 40"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -181,7 +193,10 @@ fn group_by_averages_are_correct() {
 fn sort_ascending_produces_sorted_output() {
     let values: Vec<u64> = vec![50, 10, 80, 20, 40];
     let batch = DataBatch {
-        columns: vec![ColumnData { name: "salary".into(), values }],
+        columns: vec![ColumnData {
+            name: "salary".into(),
+            values,
+        }],
         row_count: 5,
     };
 
@@ -194,7 +209,10 @@ fn sort_ascending_produces_sorted_output() {
 fn sort_descending_produces_sorted_output() {
     let values: Vec<u64> = vec![30, 90, 10, 60, 50];
     let batch = DataBatch {
-        columns: vec![ColumnData { name: "salary".into(), values }],
+        columns: vec![ColumnData {
+            name: "salary".into(),
+            values,
+        }],
         row_count: 5,
     };
 
@@ -207,7 +225,10 @@ fn sort_descending_produces_sorted_output() {
 fn sort_top_k_ascending_returns_k_rows() {
     let values: Vec<u64> = vec![50, 10, 80, 20, 40, 30, 70, 60];
     let batch = DataBatch {
-        columns: vec![ColumnData { name: "score".into(), values }],
+        columns: vec![ColumnData {
+            name: "score".into(),
+            values,
+        }],
         row_count: 8,
     };
 
@@ -220,7 +241,10 @@ fn sort_top_k_ascending_returns_k_rows() {
 fn sort_top_k_descending_returns_k_rows() {
     let values: Vec<u64> = vec![50, 10, 80, 20, 40, 30, 70, 60];
     let batch = DataBatch {
-        columns: vec![ColumnData { name: "score".into(), values }],
+        columns: vec![ColumnData {
+            name: "score".into(),
+            values,
+        }],
         row_count: 8,
     };
 
@@ -234,7 +258,10 @@ fn sort_preserves_row_count() {
     let n = 100usize;
     let values: Vec<u64> = (0..n).rev().map(|i| i as u64).collect();
     let batch = DataBatch {
-        columns: vec![ColumnData { name: "amount".into(), values }],
+        columns: vec![ColumnData {
+            name: "amount".into(),
+            values,
+        }],
         row_count: n,
     };
 
@@ -246,7 +273,9 @@ fn sort_preserves_row_count() {
         assert!(
             col.values[i - 1] <= col.values[i],
             "not sorted at index {}: {} > {}",
-            i, col.values[i - 1], col.values[i]
+            i,
+            col.values[i - 1],
+            col.values[i]
         );
     }
 }
@@ -255,7 +284,10 @@ fn sort_preserves_row_count() {
 fn sort_already_sorted_asc_is_stable() {
     let values: Vec<u64> = vec![1, 2, 3, 4, 5];
     let batch = DataBatch {
-        columns: vec![ColumnData { name: "val".into(), values: values.clone() }],
+        columns: vec![ColumnData {
+            name: "val".into(),
+            values: values.clone(),
+        }],
         row_count: 5,
     };
     let result = execute_sort_asc(&batch, "val");
@@ -266,7 +298,10 @@ fn sort_already_sorted_asc_is_stable() {
 fn sort_trace_verify_passes() {
     let values: Vec<u64> = vec![5, 3, 1, 4, 2];
     let batch = DataBatch {
-        columns: vec![ColumnData { name: "val".into(), values }],
+        columns: vec![ColumnData {
+            name: "val".into(),
+            values,
+        }],
         row_count: 5,
     };
     let result = execute_sort_asc(&batch, "val");
@@ -286,31 +321,53 @@ fn equi_join_basic_key_matching() {
     // Right: manager_id [2,4] → should match rows 2 and 4
     let left = DataBatch {
         columns: vec![
-            ColumnData { name: "employee_id".into(), values: vec![1, 2, 3, 4] },
-            ColumnData { name: "salary".into(), values: vec![100, 200, 300, 400] },
+            ColumnData {
+                name: "employee_id".into(),
+                values: vec![1, 2, 3, 4],
+            },
+            ColumnData {
+                name: "salary".into(),
+                values: vec![100, 200, 300, 400],
+            },
         ],
         row_count: 4,
     };
     let right = DataBatch {
         columns: vec![
-            ColumnData { name: "manager_id".into(), values: vec![2, 4] },
-            ColumnData { name: "report_salary".into(), values: vec![50, 60] },
+            ColumnData {
+                name: "manager_id".into(),
+                values: vec![2, 4],
+            },
+            ColumnData {
+                name: "report_salary".into(),
+                values: vec![50, 60],
+            },
         ],
         row_count: 2,
     };
 
     let result = execute_equi_join(&left, &right, "employee_id", "manager_id");
-    assert_eq!(result.result_count, 2, "expected 2 join results, got {}", result.result_count);
+    assert_eq!(
+        result.result_count, 2,
+        "expected 2 join results, got {}",
+        result.result_count
+    );
 }
 
 #[test]
 fn equi_join_no_matches_produces_empty_result() {
     let left = DataBatch {
-        columns: vec![ColumnData { name: "id".into(), values: vec![1, 2, 3] }],
+        columns: vec![ColumnData {
+            name: "id".into(),
+            values: vec![1, 2, 3],
+        }],
         row_count: 3,
     };
     let right = DataBatch {
-        columns: vec![ColumnData { name: "ref_id".into(), values: vec![10, 20] }],
+        columns: vec![ColumnData {
+            name: "ref_id".into(),
+            values: vec![10, 20],
+        }],
         row_count: 2,
     };
 
@@ -322,15 +379,27 @@ fn equi_join_no_matches_produces_empty_result() {
 fn equi_join_all_keys_match() {
     let left = DataBatch {
         columns: vec![
-            ColumnData { name: "key".into(), values: vec![5, 10, 15] },
-            ColumnData { name: "lval".into(), values: vec![1, 2, 3] },
+            ColumnData {
+                name: "key".into(),
+                values: vec![5, 10, 15],
+            },
+            ColumnData {
+                name: "lval".into(),
+                values: vec![1, 2, 3],
+            },
         ],
         row_count: 3,
     };
     let right = DataBatch {
         columns: vec![
-            ColumnData { name: "key".into(), values: vec![5, 10, 15] },
-            ColumnData { name: "rval".into(), values: vec![4, 5, 6] },
+            ColumnData {
+                name: "key".into(),
+                values: vec![5, 10, 15],
+            },
+            ColumnData {
+                name: "rval".into(),
+                values: vec![4, 5, 6],
+            },
         ],
         row_count: 3,
     };
@@ -342,11 +411,17 @@ fn equi_join_all_keys_match() {
 #[test]
 fn equi_join_trace_verify_passes() {
     let left = DataBatch {
-        columns: vec![ColumnData { name: "id".into(), values: vec![1, 2, 3] }],
+        columns: vec![ColumnData {
+            name: "id".into(),
+            values: vec![1, 2, 3],
+        }],
         row_count: 3,
     };
     let right = DataBatch {
-        columns: vec![ColumnData { name: "fk".into(), values: vec![1, 3] }],
+        columns: vec![ColumnData {
+            name: "fk".into(),
+            values: vec![1, 3],
+        }],
         row_count: 2,
     };
 
@@ -375,8 +450,15 @@ async fn baseline_backend_runs_filter_scenario() {
     .with_backend(BackendKind::Baseline);
 
     let result = runner.run(&scenario).await;
-    assert!(result.success, "baseline filter benchmark failed: {:?}", result.error);
-    assert!(result.metrics.proof_size_bytes > 0, "expected non-empty proof");
+    assert!(
+        result.success,
+        "baseline filter benchmark failed: {:?}",
+        result.error
+    );
+    assert!(
+        result.metrics.proof_size_bytes > 0,
+        "expected non-empty proof"
+    );
     assert!(result.metrics.proof_generation_us > 0);
     assert!(result.metrics.verification_us > 0);
 }
@@ -395,7 +477,11 @@ async fn baseline_backend_runs_aggregate_scenario() {
     .with_backend(BackendKind::Baseline);
 
     let result = runner.run(&scenario).await;
-    assert!(result.success, "baseline aggregate benchmark failed: {:?}", result.error);
+    assert!(
+        result.success,
+        "baseline aggregate benchmark failed: {:?}",
+        result.error
+    );
 }
 
 #[tokio::test]
@@ -412,7 +498,11 @@ async fn baseline_backend_runs_sort_scenario() {
     .with_backend(BackendKind::Baseline);
 
     let result = runner.run(&scenario).await;
-    assert!(result.success, "baseline sort benchmark failed: {:?}", result.error);
+    assert!(
+        result.success,
+        "baseline sort benchmark failed: {:?}",
+        result.error
+    );
 }
 
 #[tokio::test]
@@ -429,7 +519,11 @@ async fn baseline_backend_runs_group_by_scenario() {
     .with_backend(BackendKind::Baseline);
 
     let result = runner.run(&scenario).await;
-    assert!(result.success, "baseline group_by benchmark failed: {:?}", result.error);
+    assert!(
+        result.success,
+        "baseline group_by benchmark failed: {:?}",
+        result.error
+    );
 }
 
 #[tokio::test]
@@ -447,7 +541,11 @@ async fn baseline_proof_is_structured_json() {
     .with_backend(BackendKind::Baseline);
 
     let result = runner.run(&scenario).await;
-    assert!(result.success, "baseline scenario failed: {:?}", result.error);
+    assert!(
+        result.success,
+        "baseline scenario failed: {:?}",
+        result.error
+    );
     // Baseline proof bytes are non-empty
     assert!(
         result.metrics.proof_size_bytes > 0,
@@ -465,16 +563,20 @@ async fn baseline_and_mock_both_succeed_same_scenario() {
     .with_chunk_size(32);
 
     let baseline_backend = Arc::new(ConstraintCheckedBackend::new());
-    let mock_backend = Arc::new(MockBackend::default());
+    let mock_backend = Arc::new(ConstraintCheckedBackend::default());
 
     let baseline_result = BenchmarkRunner::in_memory(baseline_backend)
         .run(&scenario.clone().with_backend(BackendKind::Baseline))
         .await;
     let mock_result = BenchmarkRunner::in_memory(mock_backend)
-        .run(&scenario.clone().with_backend(BackendKind::Mock))
+        .run(&scenario.clone().with_backend(BackendKind::ConstraintChecked))
         .await;
 
-    assert!(baseline_result.success, "baseline failed: {:?}", baseline_result.error);
+    assert!(
+        baseline_result.success,
+        "baseline failed: {:?}",
+        baseline_result.error
+    );
     assert!(mock_result.success, "mock failed: {:?}", mock_result.error);
     assert!(baseline_result.metrics.proof_size_bytes > 0);
     assert!(mock_result.metrics.proof_size_bytes > 0);
@@ -486,31 +588,37 @@ async fn baseline_and_mock_both_succeed_same_scenario() {
 
 #[tokio::test]
 async fn group_by_suite_all_pass_mock() {
-    let backend = Arc::new(MockBackend::default());
-    let scenarios = group_by_suite(100, BackendKind::Mock);
+    let backend = Arc::new(ConstraintCheckedBackend::default());
+    let scenarios = group_by_suite(100, BackendKind::ConstraintChecked);
     let (total, successful, failed) = run_all(backend, &scenarios).await;
     println!("group_by suite (mock): {}/{} passed", successful, total);
-    for f in &failed { eprintln!("  FAIL: {}", f); }
+    for f in &failed {
+        eprintln!("  FAIL: {}", f);
+    }
     assert_eq!(successful, total);
 }
 
 #[tokio::test]
 async fn sort_suite_all_pass_mock() {
-    let backend = Arc::new(MockBackend::default());
-    let scenarios = sort_suite(100, BackendKind::Mock);
+    let backend = Arc::new(ConstraintCheckedBackend::default());
+    let scenarios = sort_suite(100, BackendKind::ConstraintChecked);
     let (total, successful, failed) = run_all(backend, &scenarios).await;
     println!("sort suite (mock): {}/{} passed", successful, total);
-    for f in &failed { eprintln!("  FAIL: {}", f); }
+    for f in &failed {
+        eprintln!("  FAIL: {}", f);
+    }
     assert_eq!(successful, total);
 }
 
 #[tokio::test]
 async fn join_suite_all_pass_mock() {
-    let backend = Arc::new(MockBackend::default());
-    let scenarios = join_suite(100, BackendKind::Mock);
+    let backend = Arc::new(ConstraintCheckedBackend::default());
+    let scenarios = join_suite(100, BackendKind::ConstraintChecked);
     let (total, successful, failed) = run_all(backend, &scenarios).await;
     println!("join suite (mock): {}/{} passed", successful, total);
-    for f in &failed { eprintln!("  FAIL: {}", f); }
+    for f in &failed {
+        eprintln!("  FAIL: {}", f);
+    }
     assert_eq!(successful, total);
 }
 
@@ -520,7 +628,9 @@ async fn group_by_suite_all_pass_baseline() {
     let scenarios = group_by_suite(100, BackendKind::Baseline);
     let (total, successful, failed) = run_all(backend, &scenarios).await;
     println!("group_by suite (baseline): {}/{} passed", successful, total);
-    for f in &failed { eprintln!("  FAIL: {}", f); }
+    for f in &failed {
+        eprintln!("  FAIL: {}", f);
+    }
     assert!(successful > 0, "no group_by scenarios passed on baseline");
 }
 
@@ -530,7 +640,9 @@ async fn sort_suite_all_pass_baseline() {
     let scenarios = sort_suite(100, BackendKind::Baseline);
     let (total, successful, failed) = run_all(backend, &scenarios).await;
     println!("sort suite (baseline): {}/{} passed", successful, total);
-    for f in &failed { eprintln!("  FAIL: {}", f); }
+    for f in &failed {
+        eprintln!("  FAIL: {}", f);
+    }
     assert!(successful > 0, "no sort scenarios passed on baseline");
 }
 
@@ -540,12 +652,12 @@ async fn sort_suite_all_pass_baseline() {
 
 #[tokio::test]
 async fn compare_mock_vs_baseline_on_standard_suite() {
-    let scenarios = standard_suite(100, BackendKind::Mock);
+    let scenarios = standard_suite(100, BackendKind::ConstraintChecked);
     let mut mock_wins = 0usize;
     let mut baseline_wins = 0usize;
 
     for scenario in &scenarios {
-        let mock_backend = Arc::new(MockBackend::default());
+        let mock_backend = Arc::new(ConstraintCheckedBackend::default());
         let baseline_backend = Arc::new(ConstraintCheckedBackend::new());
 
         let mock_result = BenchmarkRunner::in_memory(mock_backend).run(scenario).await;
@@ -554,7 +666,11 @@ async fn compare_mock_vs_baseline_on_standard_suite() {
             .await;
 
         assert!(mock_result.success, "mock failed on {}", scenario.name);
-        assert!(baseline_result.success, "baseline failed on {}", scenario.name);
+        assert!(
+            baseline_result.success,
+            "baseline failed on {}",
+            scenario.name
+        );
 
         if mock_result.metrics.proof_generation_us <= baseline_result.metrics.proof_generation_us {
             mock_wins += 1;
@@ -565,9 +681,11 @@ async fn compare_mock_vs_baseline_on_standard_suite() {
 
     println!(
         "\n=== Backend Comparison (standard suite, {} scenarios) ===\n\
-         MockBackend faster:         {} scenarios\n\
+         ConstraintChecked faster:         {} scenarios\n\
          ConstraintCheckedBackend faster: {} scenarios",
-        scenarios.len(), mock_wins, baseline_wins
+        scenarios.len(),
+        mock_wins,
+        baseline_wins
     );
     // Both backends must run all scenarios — no assertion on which is faster
 }
@@ -578,7 +696,7 @@ async fn compare_mock_vs_baseline_on_standard_suite() {
 
 #[tokio::test]
 async fn employees_group_by_department_passes() {
-    let backend = Arc::new(MockBackend::default());
+    let backend = Arc::new(ConstraintCheckedBackend::default());
     let runner = BenchmarkRunner::in_memory(backend);
 
     let scenario = BenchmarkScenario::new(
@@ -587,15 +705,19 @@ async fn employees_group_by_department_passes() {
         200,
     )
     .with_chunk_size(64)
-    .with_backend(BackendKind::Mock);
+    .with_backend(BackendKind::ConstraintChecked);
 
     let result = runner.run(&scenario).await;
-    assert!(result.success, "employees group_by failed: {:?}", result.error);
+    assert!(
+        result.success,
+        "employees group_by failed: {:?}",
+        result.error
+    );
 }
 
 #[tokio::test]
 async fn employees_sort_salary_passes() {
-    let backend = Arc::new(MockBackend::default());
+    let backend = Arc::new(ConstraintCheckedBackend::default());
     let runner = BenchmarkRunner::in_memory(backend);
 
     let scenario = BenchmarkScenario::new(
@@ -604,7 +726,7 @@ async fn employees_sort_salary_passes() {
         200,
     )
     .with_chunk_size(64)
-    .with_backend(BackendKind::Mock);
+    .with_backend(BackendKind::ConstraintChecked);
 
     let result = runner.run(&scenario).await;
     assert!(result.success, "employees sort failed: {:?}", result.error);
@@ -612,7 +734,7 @@ async fn employees_sort_salary_passes() {
 
 #[tokio::test]
 async fn employees_top10_salary_passes() {
-    let backend = Arc::new(MockBackend::default());
+    let backend = Arc::new(ConstraintCheckedBackend::default());
     let runner = BenchmarkRunner::in_memory(backend);
 
     let scenario = BenchmarkScenario::new(
@@ -621,15 +743,19 @@ async fn employees_top10_salary_passes() {
         200,
     )
     .with_chunk_size(64)
-    .with_backend(BackendKind::Mock);
+    .with_backend(BackendKind::ConstraintChecked);
 
     let result = runner.run(&scenario).await;
-    assert!(result.success, "employees top-10 failed: {:?}", result.error);
+    assert!(
+        result.success,
+        "employees top-10 failed: {:?}",
+        result.error
+    );
 }
 
 #[tokio::test]
 async fn employees_avg_salary_by_dept_passes() {
-    let backend = Arc::new(MockBackend::default());
+    let backend = Arc::new(ConstraintCheckedBackend::default());
     let runner = BenchmarkRunner::in_memory(backend);
 
     let scenario = BenchmarkScenario::new(
@@ -638,10 +764,14 @@ async fn employees_avg_salary_by_dept_passes() {
         200,
     )
     .with_chunk_size(64)
-    .with_backend(BackendKind::Mock);
+    .with_backend(BackendKind::ConstraintChecked);
 
     let result = runner.run(&scenario).await;
-    assert!(result.success, "employees avg salary failed: {:?}", result.error);
+    assert!(
+        result.success,
+        "employees avg salary failed: {:?}",
+        result.error
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -650,20 +780,24 @@ async fn employees_avg_salary_by_dept_passes() {
 
 #[tokio::test]
 async fn full_operator_suite_smoke_test() {
-    let backend = Arc::new(MockBackend::default());
-    let scenarios = full_operator_suite(100, BackendKind::Mock);
+    let backend = Arc::new(ConstraintCheckedBackend::default());
+    let scenarios = full_operator_suite(100, BackendKind::ConstraintChecked);
     let (total, successful, failed) = run_all(backend, &scenarios).await;
 
     println!(
         "\n=== Full Operator Suite ===\n{}/{} scenarios passed",
         successful, total
     );
-    for f in &failed { println!("  FAIL: {}", f); }
+    for f in &failed {
+        println!("  FAIL: {}", f);
+    }
 
     assert_eq!(
-        successful, total,
+        successful,
+        total,
         "full_operator_suite: {}/{} failed:\n{}",
-        total - successful, total,
+        total - successful,
+        total,
         failed.join("\n")
     );
 }

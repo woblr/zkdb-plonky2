@@ -26,7 +26,11 @@ pub enum Expr {
     UnaryOp { op: UnaryOp, operand: Box<Expr> },
 
     /// Aggregate function.
-    Agg { kind: AggKind, input: Box<Expr>, distinct: bool },
+    Agg {
+        kind: AggKind,
+        input: Box<Expr>,
+        distinct: bool,
+    },
 
     /// CASE WHEN … THEN … ELSE … END
     Case {
@@ -58,7 +62,10 @@ pub enum Expr {
 
 impl Expr {
     pub fn column(name: impl Into<String>) -> Self {
-        Expr::Column { table: None, name: name.into() }
+        Expr::Column {
+            table: None,
+            name: name.into(),
+        }
     }
 
     pub fn int(n: i64) -> Self {
@@ -88,7 +95,10 @@ impl Expr {
             }
             Expr::UnaryOp { operand, .. } => operand.referenced_columns(),
             Expr::Agg { input, .. } => input.referenced_columns(),
-            Expr::Case { conditions, else_result } => {
+            Expr::Case {
+                conditions,
+                else_result,
+            } => {
                 let mut cols = vec![];
                 for (cond, then) in conditions {
                     cols.extend(cond.referenced_columns());
@@ -100,7 +110,9 @@ impl Expr {
                 cols
             }
             Expr::IsNull { expr, .. } => expr.referenced_columns(),
-            Expr::Between { expr, low, high, .. } => {
+            Expr::Between {
+                expr, low, high, ..
+            } => {
                 let mut cols = expr.referenced_columns();
                 cols.extend(low.referenced_columns());
                 cols.extend(high.referenced_columns());
@@ -130,10 +142,20 @@ pub enum Literal {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BinOp {
-    Eq, Ne, Lt, Lte, Gt, Gte,
-    And, Or,
-    Add, Sub, Mul, Div,
-    Like, NotLike,
+    Eq,
+    Ne,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
+    And,
+    Or,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Like,
+    NotLike,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -210,8 +232,7 @@ impl SelectStatement {
     }
 
     pub fn has_aggregates(&self) -> bool {
-        self.projections.iter().any(|p| is_aggregate(&p.expr))
-            || !self.group_by.is_empty()
+        self.projections.iter().any(|p| is_aggregate(&p.expr)) || !self.group_by.is_empty()
     }
 }
 

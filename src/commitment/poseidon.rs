@@ -56,9 +56,9 @@ pub fn compute_snap_lo(n_rows: usize, values: &[u64]) -> u64 {
 /// Pack `values` (zero-padded / truncated to `n_rows`) into Goldilocks
 /// field elements for use with `PoseidonHash::hash_no_pad`.
 pub fn padded_field_elements(n_rows: usize, values: &[u64]) -> Vec<F> {
-    (0..n_rows).map(|i| {
-        F::from_canonical_u64(if i < values.len() { values[i] } else { 0 })
-    }).collect()
+    (0..n_rows)
+        .map(|i| F::from_canonical_u64(if i < values.len() { values[i] } else { 0 }))
+        .collect()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,12 +80,15 @@ pub fn row_primary_field_element(row_bytes: &[u8]) -> u64 {
 /// Pack arbitrary bytes into Goldilocks field elements (8 bytes each, LE).
 /// Pads the last element with zeros if `bytes.len()` is not a multiple of 8.
 pub fn bytes_to_field_elements(bytes: &[u8]) -> Vec<F> {
-    bytes.chunks(8).map(|chunk| {
-        let mut buf = [0u8; 8];
-        let len = chunk.len();
-        buf[..len].copy_from_slice(chunk);
-        F::from_canonical_u64(u64::from_le_bytes(buf))
-    }).collect()
+    bytes
+        .chunks(8)
+        .map(|chunk| {
+            let mut buf = [0u8; 8];
+            let len = chunk.len();
+            buf[..len].copy_from_slice(chunk);
+            F::from_canonical_u64(u64::from_le_bytes(buf))
+        })
+        .collect()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -142,7 +145,10 @@ mod tests {
     fn different_values_produce_different_snap_lo() {
         let a = compute_snap_lo(MAX_ROWS, &[1u64, 2, 3]);
         let b = compute_snap_lo(MAX_ROWS, &[1u64, 2, 4]); // last value changed
-        assert_ne!(a, b, "different inputs must produce different Poseidon hashes");
+        assert_ne!(
+            a, b,
+            "different inputs must produce different Poseidon hashes"
+        );
     }
 
     #[test]
@@ -167,7 +173,10 @@ mod tests {
         let root = poseidon_snapshot_root(&rows);
         let lo = commitment_lo(&root);
         // lo must equal compute_snap_lo of the primary field elements
-        let primary: Vec<u64> = rows.iter().map(|rb| row_primary_field_element(rb)).collect();
+        let primary: Vec<u64> = rows
+            .iter()
+            .map(|rb| row_primary_field_element(rb))
+            .collect();
         let expected_lo = compute_snap_lo(MAX_ROWS, &primary);
         assert_eq!(lo, expected_lo);
     }

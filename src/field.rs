@@ -165,7 +165,10 @@ pub fn bytes_to_fields(bytes: &[u8]) -> Vec<FieldElement> {
 
 /// Pack up to 8 bytes into a single field element (LE).
 pub fn pack_bytes_to_field(bytes: &[u8]) -> FieldElement {
-    assert!(bytes.len() <= 8, "cannot pack more than 8 bytes into one field element");
+    assert!(
+        bytes.len() <= 8,
+        "cannot pack more than 8 bytes into one field element"
+    );
     let mut buf = [0u8; 8];
     buf[..bytes.len()].copy_from_slice(bytes);
     FieldElement::new(u64::from_le_bytes(buf))

@@ -82,7 +82,9 @@ fn translate_select(
 ) -> ZkResult<SelectStatement> {
     // FROM clause
     if select.from.is_empty() {
-        return Err(ZkDbError::QueryParse("SELECT requires a FROM clause".into()));
+        return Err(ZkDbError::QueryParse(
+            "SELECT requires a FROM clause".into(),
+        ));
     }
     let (from_table, from_alias, joins) = translate_from(&select.from)?;
 
@@ -90,23 +92,18 @@ fn translate_select(
     let projections: Vec<SelectItem> = select
         .projection
         .iter()
-        .map(|item| translate_select_item(item))
+        .map(translate_select_item)
         .collect::<ZkResult<_>>()?;
 
     // WHERE
-    let where_clause = select
-        .selection
-        .as_ref()
-        .map(translate_expr)
-        .transpose()?;
+    let where_clause = select.selection.as_ref().map(translate_expr).transpose()?;
 
     // GROUP BY
     let group_by = match &select.group_by {
         sql::GroupByExpr::All => vec![],
-        sql::GroupByExpr::Expressions(exprs) => exprs
-            .iter()
-            .map(translate_expr)
-            .collect::<ZkResult<_>>()?,
+        sql::GroupByExpr::Expressions(exprs) => {
+            exprs.iter().map(translate_expr).collect::<ZkResult<_>>()?
+        }
     };
 
     // HAVING
@@ -149,7 +146,7 @@ fn translate_from(
     let joins: Vec<JoinClause> = first
         .joins
         .iter()
-        .map(|j| translate_join(j))
+        .map(translate_join)
         .collect::<ZkResult<_>>()?;
 
     Ok((table_name, alias, joins))
@@ -194,7 +191,12 @@ fn translate_join(join: &sql::Join) -> ZkResult<JoinClause> {
         None
     };
 
-    Ok(JoinClause { table, alias, kind, condition: cond_expr })
+    Ok(JoinClause {
+        table,
+        alias,
+        kind,
+        condition: cond_expr,
+    })
 }
 
 fn translate_select_item(item: &sql::SelectItem) -> ZkResult<SelectItem> {
@@ -293,8 +295,17 @@ fn translate_expr(expr: &sql::Expr) -> ZkResult<Expr> {
             })
         }
 
-        sql::Expr::Like { expr, negated, pattern, .. } => Ok(Expr::BinOp {
-            op: if *negated { BinOp::NotLike } else { BinOp::Like },
+        sql::Expr::Like {
+            expr,
+            negated,
+            pattern,
+            ..
+        } => Ok(Expr::BinOp {
+            op: if *negated {
+                BinOp::NotLike
+            } else {
+                BinOp::Like
+            },
             left: Box::new(translate_expr(expr)?),
             right: Box::new(translate_expr(pattern)?),
         }),
@@ -406,8 +417,8 @@ mod tests {
 
     #[test]
     fn parse_simple_select() {
-        let stmt = QueryParser::parse("SELECT id, salary FROM employees WHERE salary > 50000")
-            .unwrap();
+        let stmt =
+            QueryParser::parse("SELECT id, salary FROM employees WHERE salary > 50000").unwrap();
         assert_eq!(stmt.from_table, "employees");
         assert_eq!(stmt.projections.len(), 2);
         assert!(stmt.where_clause.is_some());
@@ -415,18 +426,16 @@ mod tests {
 
     #[test]
     fn parse_aggregate() {
-        let stmt = QueryParser::parse(
-            "SELECT dept, COUNT(*), AVG(salary) FROM employees GROUP BY dept",
-        )
-        .unwrap();
+        let stmt =
+            QueryParser::parse("SELECT dept, COUNT(*), AVG(salary) FROM employees GROUP BY dept")
+                .unwrap();
         assert!(stmt.has_aggregates());
         assert_eq!(stmt.group_by.len(), 1);
     }
 
     #[test]
     fn parse_limit_offset() {
-        let stmt =
-            QueryParser::parse("SELECT id FROM t LIMIT 100 OFFSET 50").unwrap();
+        let stmt = QueryParser::parse("SELECT id FROM t LIMIT 100 OFFSET 50").unwrap();
         assert_eq!(stmt.limit, Some(100));
         assert_eq!(stmt.offset, Some(50));
     }

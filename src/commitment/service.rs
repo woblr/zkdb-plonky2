@@ -1,6 +1,7 @@
 //! Commitment service: builds snapshot manifests from staged chunks.
 
 use crate::commitment::merkle::{hash_leaf, MerkleTree};
+use crate::commitment::poseidon::{commitment_lo, poseidon_snapshot_root};
 use crate::commitment::root::{ChunkEntry, TableRoot};
 use crate::database::schema::DatasetSchema;
 use crate::database::snapshot::SnapshotManifest;
@@ -40,7 +41,9 @@ impl CommitmentService for Blake3CommitmentService {
         staged_chunks: &[StagedChunk],
     ) -> ZkResult<SnapshotManifest> {
         if staged_chunks.is_empty() {
-            return Err(ZkDbError::Commitment("cannot build manifest from empty chunks".into()));
+            return Err(ZkDbError::Commitment(
+                "cannot build manifest from empty chunks".into(),
+            ));
         }
 
         let schema_hash = schema.schema_hash();
@@ -55,11 +58,7 @@ impl CommitmentService for Blake3CommitmentService {
 
         for chunk in staged_chunks {
             // Build Merkle tree for this chunk from pre-computed leaf hashes.
-            let leaves: Vec<[u8; 32]> = chunk
-                .leaf_hashes
-                .iter()
-                .map(|h| hash_leaf(h))
-                .collect();
+            let leaves: Vec<[u8; 32]> = chunk.leaf_hashes.iter().map(|h| hash_leaf(h)).collect();
 
             if leaves.is_empty() {
                 return Err(ZkDbError::Commitment(format!(
@@ -101,6 +100,44 @@ impl CommitmentService for Blake3CommitmentService {
         let snapshot_tree = MerkleTree::build(&table_root_bytes);
         let snapshot_root = snapshot_tree.root();
 
+        // Compute Poseidon snap_lo for each column in the schema.
+        // This gives the query engine a circuit-compatible anchor regardless of
+        // which column is chosen as the primary extraction point (e.g. aggregate or sort key).
+        let all_row_bytes: Vec<Vec<u8>> = staged_chunks
+            .iter()
+            .flat_map(|c| c.row_bytes.iter().cloned())
+            .collect();
+        
+        let mut column_poseidon_roots = std::collections::HashMap::new();
+        // Fallback root over the first 8 bytes
+        let mut fallback_root_computed = false;
+        
+        for col in &schema.columns {
+            use std::sync::Arc;
+            // A temporary dummy schema used just to call extract_col on this single column.
+            let dummy_schema = DatasetSchema {
+                dataset_id: dataset_id.clone(),
+                name: schema.name.clone(),
+                columns: vec![col.clone()],
+                encoding_spec_version: schema.encoding_spec_version,
+                description: None,
+                primary_key: None,
+                schema_version: 1,
+                created_at_ms: 0,
+            };
+            if let Ok(col_fes) = crate::circuit::witness::extract_col(&all_row_bytes, &Some(dummy_schema), &Some(col.name.clone()), 0) {
+                let snap_lo = crate::commitment::poseidon::compute_snap_lo(crate::commitment::poseidon::MAX_ROWS, &col_fes);
+                column_poseidon_roots.insert(col.name.clone(), snap_lo);
+                // The first column can act as a fallback if needed
+                if !fallback_root_computed {
+                    fallback_root_computed = true;
+                }
+            }
+        }
+        
+        let poseidon_root = poseidon_snapshot_root(&all_row_bytes);
+        let poseidon_snap_lo = commitment_lo(&poseidon_root);
+
         Ok(SnapshotManifest::new(
             snapshot_id,
             dataset_id,
@@ -111,6 +148,8 @@ impl CommitmentService for Blake3CommitmentService {
             total_rows,
             chunk_size,
             schema.encoding_spec_version,
+            column_poseidon_roots,
+            poseidon_snap_lo,
         ))
     }
 }

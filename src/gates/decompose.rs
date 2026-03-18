@@ -19,7 +19,7 @@ impl ByteDecomposition {
     pub fn decompose(value: u64) -> Self {
         let mut bytes = [FieldElement::ZERO; 8];
         for i in 0..8 {
-            bytes[i] = FieldElement::new(((value >> (8 * i)) & 0xFF) as u64);
+            bytes[i] = FieldElement::new((((value >> (8 * i)) & 0xFF)));
         }
         Self {
             bytes,

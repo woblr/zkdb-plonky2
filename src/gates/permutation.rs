@@ -21,9 +21,9 @@ pub fn multiset_equal(a: &[u64], b: &[u64]) -> bool {
 /// Two multisets are equal with high probability if their fingerprints match
 /// for a random challenge.
 pub fn multiset_fingerprint(values: &[u64], challenge: u64) -> u64 {
-    values.iter().fold(1u64, |acc, &v| {
-        acc.wrapping_mul(challenge.wrapping_sub(v))
-    })
+    values
+        .iter()
+        .fold(1u64, |acc, &v| acc.wrapping_mul(challenge.wrapping_sub(v)))
 }
 
 /// Verify a permutation maps input to output correctly.

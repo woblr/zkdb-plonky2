@@ -96,7 +96,9 @@ pub struct ConstraintCheckedBackend {
 
 impl ConstraintCheckedBackend {
     pub fn new() -> Self {
-        Self { params: CircuitParams::default() }
+        Self {
+            params: CircuitParams::default(),
+        }
     }
 
     pub fn with_params(params: CircuitParams) -> Self {
@@ -117,20 +119,30 @@ impl ConstraintCheckedBackend {
     }
 
     fn column_commitments(witness: &WitnessTrace) -> Vec<[u8; 32]> {
-        witness.columns.iter().map(|col| {
-            let mut h = blake3::Hasher::new();
-            h.update(col.column_name.as_bytes());
-            for fe in &col.values { h.update(&fe.to_canonical_bytes()); }
-            for &null in &col.nulls { h.update(&[null as u8]); }
-            *h.finalize().as_bytes()
-        }).collect()
+        witness
+            .columns
+            .iter()
+            .map(|col| {
+                let mut h = blake3::Hasher::new();
+                h.update(col.column_name.as_bytes());
+                for fe in &col.values {
+                    h.update(&fe.to_canonical_bytes());
+                }
+                for &null in &col.nulls {
+                    h.update(&[null as u8]);
+                }
+                *h.finalize().as_bytes()
+            })
+            .collect()
     }
 
     fn merkle_root(leaves: &[[u8; 32]]) -> [u8; 32] {
-        if leaves.is_empty() { return [0u8; 32]; }
+        if leaves.is_empty() {
+            return [0u8; 32];
+        }
         let mut cur = leaves.to_vec();
         while cur.len() > 1 {
-            let mut next = Vec::with_capacity((cur.len() + 1) / 2);
+            let mut next = Vec::with_capacity(cur.len().div_ceil(2));
             for pair in cur.chunks(2) {
                 let mut h = blake3::Hasher::new();
                 h.update(&pair[0]);
@@ -172,15 +184,23 @@ impl ConstraintCheckedBackend {
         use crate::circuit::operator::*;
         match tag {
             "table_scan" => Box::new(TableScanCircuit),
-            "filter"     => Box::new(FilterCircuit { predicate_json: String::new() }),
-            "projection" => Box::new(ProjectionCircuit { items_json: String::new() }),
-            "aggregate"  => Box::new(AggregateCircuit { aggregates_json: String::new() }),
-            "group_by"   => Box::new(GroupByCircuit {
+            "filter" => Box::new(FilterCircuit {
+                predicate_json: String::new(),
+            }),
+            "projection" => Box::new(ProjectionCircuit {
+                items_json: String::new(),
+            }),
+            "aggregate" => Box::new(AggregateCircuit {
+                aggregates_json: String::new(),
+            }),
+            "group_by" => Box::new(GroupByCircuit {
                 group_by_json: String::new(),
                 aggregates_json: String::new(),
             }),
-            "sort"       => Box::new(SortCircuit { keys_json: String::new() }),
-            "hash_join"  => Box::new(JoinCircuit {
+            "sort" => Box::new(SortCircuit {
+                keys_json: String::new(),
+            }),
+            "hash_join" => Box::new(JoinCircuit {
                 condition_json: None,
                 kind_json: String::new(),
             }),
@@ -190,23 +210,25 @@ impl ConstraintCheckedBackend {
 }
 
 impl Default for ConstraintCheckedBackend {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl ProvingBackend for ConstraintCheckedBackend {
-    fn tag(&self) -> BackendTag { BackendTag::ConstraintChecked }
+    fn tag(&self) -> BackendTag {
+        BackendTag::ConstraintChecked
+    }
 
     async fn compile_circuit(&self, plan: &ProofPlan) -> ZkResult<Box<dyn CircuitHandle>> {
         let plan_json = serde_json::to_string(plan).unwrap_or_default();
         let plan_hash = *blake3::hash(plan_json.as_bytes()).as_bytes();
         let root_op = Self::root_operator(plan);
-        let circ = self.select_circuit_for_tag(
-            &{
-                use crate::circuit::operator::circuit_for_operator;
-                circuit_for_operator(root_op).operator_kind().to_string()
-            }
-        );
+        let circ = self.select_circuit_for_tag(&{
+            use crate::circuit::operator::circuit_for_operator;
+            circuit_for_operator(root_op).operator_kind().to_string()
+        });
         let pi_count = circ.public_input_count();
         let operator_tag = circ.operator_kind().to_string();
         Ok(Box::new(ConstraintCheckedCircuitHandle {
@@ -225,24 +247,24 @@ impl ProvingBackend for ConstraintCheckedBackend {
         let handle = circuit
             .as_any()
             .downcast_ref::<ConstraintCheckedCircuitHandle>()
-            .ok_or_else(|| ZkDbError::internal(
-                "ConstraintCheckedBackend::prove called with wrong handle type"
-            ))?;
-        let plan_hash  = handle.plan_hash;
-        let op_tag     = handle.operator_tag.clone();
+            .ok_or_else(|| {
+                ZkDbError::internal("ConstraintCheckedBackend::prove called with wrong handle type")
+            })?;
+        let plan_hash = handle.plan_hash;
+        let op_tag = handle.operator_tag.clone();
 
         // Real constraint validation
         let constraint_digest = self
             .select_circuit_for_tag(&op_tag)
             .validate_witness(witness)
-            .map_err(|e| ZkDbError::internal(format!(
-                "constraint validation failed [{}]: {}", op_tag, e
-            )))?;
+            .map_err(|e| {
+                ZkDbError::internal(format!("constraint validation failed [{}]: {}", op_tag, e))
+            })?;
 
         // Build hash-chain audit envelope
-        let col_commitments  = Self::column_commitments(witness);
-        let col_root         = Self::merkle_root(&col_commitments);
-        let pib              = Self::public_input_binding(
+        let col_commitments = Self::column_commitments(witness);
+        let col_root = Self::merkle_root(&col_commitments);
+        let pib = Self::public_input_binding(
             &constraint_digest,
             &witness.snapshot_root,
             &witness.query_hash,
@@ -268,7 +290,8 @@ impl ProvingBackend for ConstraintCheckedBackend {
             "operator_tag": op_tag,
             "max_rows": handle.params.max_rows,
             "num_columns": handle.params.num_columns,
-        })).unwrap_or_default();
+        }))
+        .unwrap_or_default();
 
         Ok(ProofArtifact {
             proof_id: ProofId::new(),
@@ -276,12 +299,24 @@ impl ProvingBackend for ConstraintCheckedBackend {
             snapshot_id: witness.snapshot_id.clone(),
             backend: BackendTag::ConstraintChecked,
             proof_system: ProofSystemKind::HashChainAudit,
+            capabilities: crate::proof::artifacts::ProofCapabilities::default(),
             proof_bytes,
             public_inputs: PublicInputs {
                 snapshot_root: witness.snapshot_root,
                 query_hash: witness.query_hash,
                 result_commitment: witness.result_commitment,
                 result_row_count: witness.result_row_count,
+                result_sum: 0,
+                result_commit_lo: 0,
+                group_output_lo: 0,
+                join_right_snap_lo: 0,
+                join_unmatched_count: 0,
+                pred_op: 0,
+                pred_val: 0,
+                sort_secondary_snap_lo: 0,
+                sort_secondary_hi_snap_lo: 0,
+                group_vals_snap_lo: 0,
+                agg_n_real: 0,
             },
             verification_key_bytes: vk_bytes,
             created_at_ms: now_ms(),
@@ -289,15 +324,16 @@ impl ProvingBackend for ConstraintCheckedBackend {
     }
 
     async fn verify(&self, artifact: &ProofArtifact) -> ZkResult<VerificationResult> {
-        let env: ConstraintCheckedEnvelope =
-            match serde_json::from_slice(&artifact.proof_bytes) {
-                Ok(e) => e,
-                Err(e) => return Ok(VerificationResult::invalid_with_backend(
+        let env: ConstraintCheckedEnvelope = match serde_json::from_slice(&artifact.proof_bytes) {
+            Ok(e) => e,
+            Err(e) => {
+                return Ok(VerificationResult::invalid_with_backend(
                     format!("malformed envelope: {}", e),
                     BackendTag::ConstraintChecked,
                     ProofSystemKind::HashChainAudit,
-                )),
-            };
+                ))
+            }
+        };
 
         // Re-derive public_input_binding from artifact's public inputs
         let expected_pib = Self::public_input_binding(
@@ -342,17 +378,18 @@ impl ProvingBackend for ConstraintCheckedBackend {
             snapshot_root: artifact.public_inputs.snapshot_root,
             query_hash: artifact.public_inputs.query_hash,
             result_commitment: artifact.public_inputs.result_commitment,
+            result_commit_poseidon_lo: artifact.public_inputs.result_commit_lo,
             backend: BackendTag::ConstraintChecked,
             proof_system: ProofSystemKind::HashChainAudit,
+            capabilities: crate::proof::artifacts::ProofCapabilities::default(),
             error: None,
+            warnings: vec![],
+            completeness_proved: true,
+            external_anchor_status: crate::proof::artifacts::ExternalAnchorStatus::Unanchored,
         })
     }
 
-    async fn fold(
-        &self,
-        left: &ProofArtifact,
-        right: &ProofArtifact,
-    ) -> ZkResult<ProofArtifact> {
+    async fn fold(&self, left: &ProofArtifact, right: &ProofArtifact) -> ZkResult<ProofArtifact> {
         let lenv: ConstraintCheckedEnvelope = serde_json::from_slice(&left.proof_bytes)
             .map_err(|e| ZkDbError::internal(format!("fold: left invalid: {}", e)))?;
         let renv: ConstraintCheckedEnvelope = serde_json::from_slice(&right.proof_bytes)
@@ -362,7 +399,8 @@ impl ProvingBackend for ConstraintCheckedBackend {
         let folded_cd = *blake3::Hasher::new()
             .update(&lenv.constraint_digest)
             .update(&renv.constraint_digest)
-            .finalize().as_bytes();
+            .finalize()
+            .as_bytes();
 
         // Combine column commitments from both
         let mut combined = lenv.column_commitments.clone();
@@ -373,7 +411,8 @@ impl ProvingBackend for ConstraintCheckedBackend {
         let folded_rc = *blake3::Hasher::new()
             .update(&left.public_inputs.result_commitment)
             .update(&right.public_inputs.result_commitment)
-            .finalize().as_bytes();
+            .finalize()
+            .as_bytes();
 
         let pib = Self::public_input_binding(
             &folded_cd,
@@ -401,6 +440,7 @@ impl ProvingBackend for ConstraintCheckedBackend {
             snapshot_id: left.snapshot_id.clone(),
             backend: BackendTag::ConstraintChecked,
             proof_system: ProofSystemKind::HashChainAudit,
+            capabilities: crate::proof::artifacts::ProofCapabilities::default(),
             proof_bytes,
             public_inputs: PublicInputs {
                 snapshot_root: left.public_inputs.snapshot_root,
@@ -408,6 +448,17 @@ impl ProvingBackend for ConstraintCheckedBackend {
                 result_commitment: folded_rc,
                 result_row_count: left.public_inputs.result_row_count
                     + right.public_inputs.result_row_count,
+                result_sum: 0,
+                result_commit_lo: 0,
+                group_output_lo: 0,
+                join_right_snap_lo: 0,
+                join_unmatched_count: 0,
+                pred_op: 0,
+                pred_val: 0,
+                sort_secondary_snap_lo: 0,
+                sort_secondary_hi_snap_lo: 0,
+                group_vals_snap_lo: 0,
+                agg_n_real: 0,
             },
             verification_key_bytes: left.verification_key_bytes.clone(),
             created_at_ms: now_ms(),
@@ -454,6 +505,9 @@ mod tests {
                 root_task_id: tid,
             },
             leaf_count: 1,
+            poseidon_snap_lo: 0,
+            operator_params: crate::query::proof_plan::OperatorParams::default(),
+            schema_json: None,
         }
     }
 
@@ -484,7 +538,10 @@ mod tests {
     fn group_witness() -> WitnessTrace {
         let mut w = WitnessTrace::new(QueryId::new(), SnapshotId::new());
         let keys = vec![1, 1, 2, 2, 3].into_iter().map(FieldElement).collect();
-        let vals = vec![10, 20, 30, 40, 50].into_iter().map(FieldElement).collect();
+        let vals = vec![10, 20, 30, 40, 50]
+            .into_iter()
+            .map(FieldElement)
+            .collect();
         w.columns = vec![
             ColumnTrace::new("group_key", keys),
             ColumnTrace::new("value", vals),
@@ -499,7 +556,10 @@ mod tests {
     #[tokio::test]
     async fn prove_and_verify_scan() {
         let b = ConstraintCheckedBackend::new();
-        let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+        let plan = make_plan(ProofOperator::Scan {
+            chunk_indices: vec![0],
+            column_names: None,
+        });
         let c = b.compile_circuit(&plan).await.unwrap();
         let a = b.prove(c.as_ref(), &scan_witness(10)).await.unwrap();
 
@@ -513,7 +573,9 @@ mod tests {
     #[tokio::test]
     async fn prove_and_verify_sort() {
         let b = ConstraintCheckedBackend::new();
-        let plan = make_plan(ProofOperator::Sort { keys_json: "[]".into() });
+        let plan = make_plan(ProofOperator::Sort {
+            keys_json: "[]".into(),
+        });
         let c = b.compile_circuit(&plan).await.unwrap();
         let a = b.prove(c.as_ref(), &sorted_witness(true, 5)).await.unwrap();
 
@@ -540,7 +602,10 @@ mod tests {
     #[tokio::test]
     async fn tampered_result_commitment_fails() {
         let b = ConstraintCheckedBackend::new();
-        let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+        let plan = make_plan(ProofOperator::Scan {
+            chunk_indices: vec![0],
+            column_names: None,
+        });
         let c = b.compile_circuit(&plan).await.unwrap();
         let mut a = b.prove(c.as_ref(), &scan_witness(5)).await.unwrap();
         a.public_inputs.result_commitment = [0xABu8; 32];
@@ -551,7 +616,10 @@ mod tests {
     #[tokio::test]
     async fn tampered_snapshot_root_fails() {
         let b = ConstraintCheckedBackend::new();
-        let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+        let plan = make_plan(ProofOperator::Scan {
+            chunk_indices: vec![0],
+            column_names: None,
+        });
         let c = b.compile_circuit(&plan).await.unwrap();
         let mut a = b.prove(c.as_ref(), &scan_witness(5)).await.unwrap();
         a.public_inputs.snapshot_root = [0xCDu8; 32];
@@ -564,7 +632,9 @@ mod tests {
     #[tokio::test]
     async fn unsorted_witness_fails_sort_circuit() {
         let b = ConstraintCheckedBackend::new();
-        let plan = make_plan(ProofOperator::Sort { keys_json: "[]".into() });
+        let plan = make_plan(ProofOperator::Sort {
+            keys_json: "[]".into(),
+        });
         let c = b.compile_circuit(&plan).await.unwrap();
 
         let mut w = WitnessTrace::new(QueryId::new(), SnapshotId::new());
@@ -575,11 +645,15 @@ mod tests {
         w.result_commitment = *blake3::hash(b"bad").as_bytes();
 
         let r = b.prove(c.as_ref(), &w).await;
-        assert!(r.is_err(), "unsorted witness must fail constraint validation");
+        assert!(
+            r.is_err(),
+            "unsorted witness must fail constraint validation"
+        );
         let msg = format!("{:?}", r.err().unwrap());
         assert!(
             msg.contains("constraint validation failed"),
-            "error must mention constraint validation: {}", msg
+            "error must mention constraint validation: {}",
+            msg
         );
     }
 
@@ -588,7 +662,10 @@ mod tests {
     #[tokio::test]
     async fn fold_two_proofs() {
         let b = ConstraintCheckedBackend::new();
-        let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+        let plan = make_plan(ProofOperator::Scan {
+            chunk_indices: vec![0],
+            column_names: None,
+        });
         let c = b.compile_circuit(&plan).await.unwrap();
         let a1 = b.prove(c.as_ref(), &scan_witness(4)).await.unwrap();
         let a2 = b.prove(c.as_ref(), &scan_witness(3)).await.unwrap();
@@ -604,7 +681,10 @@ mod tests {
     #[tokio::test]
     async fn proof_system_is_hash_chain_audit_not_zk() {
         let b = ConstraintCheckedBackend::new();
-        let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+        let plan = make_plan(ProofOperator::Scan {
+            chunk_indices: vec![0],
+            column_names: None,
+        });
         let c = b.compile_circuit(&plan).await.unwrap();
         let a = b.prove(c.as_ref(), &scan_witness(3)).await.unwrap();
 

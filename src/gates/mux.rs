@@ -8,7 +8,11 @@ use crate::field::FieldElement;
 /// selector=1 → a, selector=0 → b
 pub fn mux(selector: u64, a: u64, b: u64) -> u64 {
     debug_assert!(selector == 0 || selector == 1);
-    if selector == 1 { a } else { b }
+    if selector == 1 {
+        a
+    } else {
+        b
+    }
 }
 
 /// Field-level mux.
@@ -21,7 +25,11 @@ pub fn field_mux(selector: &FieldElement, a: &FieldElement, b: &FieldElement) ->
 /// Enforced by: Σ(selector_j * values_j) where exactly one selector_j = 1.
 pub fn multi_mux(selectors: &[u64], values: &[u64]) -> u64 {
     assert_eq!(selectors.len(), values.len());
-    debug_assert_eq!(selectors.iter().sum::<u64>(), 1, "exactly one selector must be 1");
+    debug_assert_eq!(
+        selectors.iter().sum::<u64>(),
+        1,
+        "exactly one selector must be 1"
+    );
     selectors
         .iter()
         .zip(values.iter())

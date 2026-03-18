@@ -89,10 +89,7 @@ pub trait SnapshotRepository: Send + Sync {
     async fn get(&self, id: &SnapshotId) -> ZkResult<SnapshotRecord>;
     async fn update(&self, record: SnapshotRecord) -> ZkResult<()>;
     async fn list_for_dataset(&self, dataset_id: &DatasetId) -> ZkResult<Vec<SnapshotRecord>>;
-    async fn active_for_dataset(
-        &self,
-        dataset_id: &DatasetId,
-    ) -> ZkResult<Option<SnapshotRecord>>;
+    async fn active_for_dataset(&self, dataset_id: &DatasetId) -> ZkResult<Option<SnapshotRecord>>;
 }
 
 /// Chunk storage for staged (pre-commit) data.
@@ -106,10 +103,7 @@ pub trait ChunkStore: Send + Sync {
         dataset_id: &DatasetId,
         snapshot_id: &SnapshotId,
     ) -> ZkResult<()>;
-    async fn read_snapshot_chunks(
-        &self,
-        snapshot_id: &SnapshotId,
-    ) -> ZkResult<Vec<StagedChunk>>;
+    async fn read_snapshot_chunks(&self, snapshot_id: &SnapshotId) -> ZkResult<Vec<StagedChunk>>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,7 +151,10 @@ impl DatasetRepository for InMemoryDatasetRepository {
     }
 
     async fn update_status(&self, id: &DatasetId, status: DatasetStatus) -> ZkResult<()> {
-        let mut record = self.records.get_mut(id).ok_or_else(|| ZkDbError::DatasetNotFound(id.clone()))?;
+        let mut record = self
+            .records
+            .get_mut(id)
+            .ok_or_else(|| ZkDbError::DatasetNotFound(id.clone()))?;
         record.status = status;
         record.updated_at_ms = now_ms();
         Ok(())
@@ -168,7 +165,10 @@ impl DatasetRepository for InMemoryDatasetRepository {
         id: &DatasetId,
         snapshot_id: Option<SnapshotId>,
     ) -> ZkResult<()> {
-        let mut record = self.records.get_mut(id).ok_or_else(|| ZkDbError::DatasetNotFound(id.clone()))?;
+        let mut record = self
+            .records
+            .get_mut(id)
+            .ok_or_else(|| ZkDbError::DatasetNotFound(id.clone()))?;
         record.active_snapshot_id = snapshot_id;
         record.updated_at_ms = now_ms();
         Ok(())
@@ -230,10 +230,7 @@ impl SnapshotRepository for InMemorySnapshotRepository {
             .collect())
     }
 
-    async fn active_for_dataset(
-        &self,
-        dataset_id: &DatasetId,
-    ) -> ZkResult<Option<SnapshotRecord>> {
+    async fn active_for_dataset(&self, dataset_id: &DatasetId) -> ZkResult<Option<SnapshotRecord>> {
         Ok(self
             .records
             .iter()
@@ -266,12 +263,19 @@ impl Default for InMemoryChunkStore {
 #[async_trait]
 impl ChunkStore for InMemoryChunkStore {
     async fn write_chunks(&self, dataset_id: &DatasetId, chunks: Vec<StagedChunk>) -> ZkResult<()> {
-        self.staging.entry(dataset_id.clone()).or_default().extend(chunks);
+        self.staging
+            .entry(dataset_id.clone())
+            .or_default()
+            .extend(chunks);
         Ok(())
     }
 
     async fn read_chunks(&self, dataset_id: &DatasetId) -> ZkResult<Vec<StagedChunk>> {
-        Ok(self.staging.get(dataset_id).map(|c| c.clone()).unwrap_or_default())
+        Ok(self
+            .staging
+            .get(dataset_id)
+            .map(|c| c.clone())
+            .unwrap_or_default())
     }
 
     async fn clear_staging(&self, dataset_id: &DatasetId) -> ZkResult<()> {
@@ -293,10 +297,7 @@ impl ChunkStore for InMemoryChunkStore {
         Ok(())
     }
 
-    async fn read_snapshot_chunks(
-        &self,
-        snapshot_id: &SnapshotId,
-    ) -> ZkResult<Vec<StagedChunk>> {
+    async fn read_snapshot_chunks(&self, snapshot_id: &SnapshotId) -> ZkResult<Vec<StagedChunk>> {
         self.snapshots
             .get(snapshot_id)
             .map(|c| c.clone())

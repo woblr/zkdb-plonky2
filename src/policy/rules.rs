@@ -39,7 +39,9 @@ impl PolicyDecision {
     }
 
     pub fn deny(reason: impl Into<String>) -> Self {
-        Self::Deny { reason: reason.into() }
+        Self::Deny {
+            reason: reason.into(),
+        }
     }
 }
 

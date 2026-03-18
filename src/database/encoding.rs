@@ -7,9 +7,9 @@
 //!   - Injective: different rows → different byte sequences (no collisions).
 //!   - Versioned: `encoding_spec_version` is stored in the snapshot manifest.
 
+use crate::database::schema::DatasetSchema;
 use crate::field::{bytes_to_fields, FieldElement};
 use crate::types::{ColumnType, ZkDbError, ZkResult};
-use crate::database::schema::DatasetSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -86,7 +86,14 @@ impl RowEncoder for DefaultRowEncoder {
         buf.extend_from_slice(&row.row_index.to_le_bytes());
 
         for (col, val) in schema.columns.iter().zip(row.values.iter()) {
-            encode_value(&mut buf, val, &col.col_type, col.nullable, &col.name, row.row_index)?;
+            encode_value(
+                &mut buf,
+                val,
+                &col.col_type,
+                col.nullable,
+                &col.name,
+                row.row_index,
+            )?;
         }
 
         let field_elements = bytes_to_fields(&buf);
@@ -166,7 +173,8 @@ fn encode_value(
         ColumnType::F32 => {
             let n = val
                 .as_f64()
-                .ok_or_else(|| enc_err(col_name, row_index, "expected number for f32"))? as f32;
+                .ok_or_else(|| enc_err(col_name, row_index, "expected number for f32"))?
+                as f32;
             buf.extend_from_slice(&n.to_le_bytes());
         }
         ColumnType::F64 => {
@@ -200,8 +208,8 @@ fn encode_value(
             let s = val
                 .as_str()
                 .ok_or_else(|| enc_err(col_name, row_index, "expected hex string for Bytes"))?;
-            let decoded =
-                hex::decode(s).map_err(|_| enc_err(col_name, row_index, "invalid hex for Bytes"))?;
+            let decoded = hex::decode(s)
+                .map_err(|_| enc_err(col_name, row_index, "invalid hex for Bytes"))?;
             if let Some(max) = max_len {
                 if decoded.len() > *max as usize {
                     return Err(enc_err(col_name, row_index, "bytes exceed max_len"));
@@ -219,7 +227,9 @@ fn encode_value(
             let s = val
                 .as_str()
                 .ok_or_else(|| enc_err(col_name, row_index, "expected UUID string"))?;
-            let u: uuid::Uuid = s.parse().map_err(|_| enc_err(col_name, row_index, "invalid UUID"))?;
+            let u: uuid::Uuid = s
+                .parse()
+                .map_err(|_| enc_err(col_name, row_index, "invalid UUID"))?;
             buf.extend_from_slice(u.as_bytes());
         }
     }
@@ -276,8 +286,7 @@ mod tests {
 
     #[test]
     fn null_on_nullable_succeeds() {
-        let schema =
-            schema_with(vec![ColumnSchema::new("val", ColumnType::I64).nullable()]);
+        let schema = schema_with(vec![ColumnSchema::new("val", ColumnType::I64).nullable()]);
         let row = RawRow {
             row_index: 0,
             values: vec![Value::Null],

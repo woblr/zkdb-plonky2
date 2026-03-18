@@ -3,20 +3,47 @@
 use crate::types::{DatasetId, QueryId, SnapshotId};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum AuditEvent {
-    DatasetCreated { dataset_id: DatasetId, name: String },
-    RowsIngested { dataset_id: DatasetId, row_count: u64, chunk_count: u32 },
-    SnapshotCreated { dataset_id: DatasetId, snapshot_id: SnapshotId },
-    SnapshotActivated { dataset_id: DatasetId, snapshot_id: SnapshotId },
-    QuerySubmitted { query_id: QueryId, dataset_id: DatasetId, user_id: Option<String> },
-    QueryCompleted { query_id: QueryId, snapshot_id: SnapshotId },
-    QueryFailed { query_id: QueryId, error: String },
-    PolicyDenied { dataset_id: DatasetId, user_id: Option<String>, reason: String },
+    DatasetCreated {
+        dataset_id: DatasetId,
+        name: String,
+    },
+    RowsIngested {
+        dataset_id: DatasetId,
+        row_count: u64,
+        chunk_count: u32,
+    },
+    SnapshotCreated {
+        dataset_id: DatasetId,
+        snapshot_id: SnapshotId,
+    },
+    SnapshotActivated {
+        dataset_id: DatasetId,
+        snapshot_id: SnapshotId,
+    },
+    QuerySubmitted {
+        query_id: QueryId,
+        dataset_id: DatasetId,
+        user_id: Option<String>,
+    },
+    QueryCompleted {
+        query_id: QueryId,
+        snapshot_id: SnapshotId,
+    },
+    QueryFailed {
+        query_id: QueryId,
+        error: String,
+    },
+    PolicyDenied {
+        dataset_id: DatasetId,
+        user_id: Option<String>,
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

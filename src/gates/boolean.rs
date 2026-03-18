@@ -2,7 +2,6 @@
 //!
 //! Enforce that wire values are 0 or 1, and implement AND, OR, NOT, XOR.
 
-
 /// Verify a value is boolean (0 or 1).
 pub fn is_boolean(v: u64) -> bool {
     v == 0 || v == 1
@@ -35,7 +34,10 @@ pub fn boolean_xor(a: u64, b: u64) -> u64 {
 /// Evaluate a filter predicate over field values.
 /// Returns a selector bitmap (0 or 1 per row).
 pub fn evaluate_selector(values: &[u64], predicate: impl Fn(u64) -> bool) -> Vec<u64> {
-    values.iter().map(|&v| if predicate(v) { 1 } else { 0 }).collect()
+    values
+        .iter()
+        .map(|&v| if predicate(v) { 1 } else { 0 })
+        .collect()
 }
 
 /// Verify selector bitmap is all-boolean.

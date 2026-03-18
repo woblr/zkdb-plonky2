@@ -1,6 +1,7 @@
 //! Benchmark-related request/response DTOs.
 
 use crate::benchmarks::types::{BackendKind, BenchmarkResult, BenchmarkScenario};
+use crate::types::ZkDbError;
 use serde::{Deserialize, Serialize};
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,9 +22,9 @@ pub struct RunBenchmarkRequest {
     /// Chunk size for ingestion.
     #[serde(default)]
     pub chunk_size: Option<u32>,
-    /// Which backend to use. Defaults to "mock".
-    #[serde(default)]
-    pub backend: Option<String>,
+    /// Which backend to use. Required. Valid values: "mock", "constraint_checked", "plonky2".
+    /// Unknown or missing backend returns HTTP 400.
+    pub backend: String,
     /// Tags for categorization.
     #[serde(default)]
     pub tags: Vec<String>,
@@ -39,9 +40,9 @@ pub struct RunSuiteRequest {
     /// Number of rows per scenario.
     #[serde(default = "default_row_count")]
     pub row_count: usize,
-    /// Override backend. Defaults to "mock".
-    #[serde(default)]
-    pub backend: Option<String>,
+    /// Which backend to use. Required. Valid values: "mock", "constraint_checked", "plonky2".
+    /// Unknown or missing backend returns HTTP 400.
+    pub backend: String,
     /// If true, run the extended suite with heavier scenarios.
     #[serde(default)]
     pub extended: bool,
@@ -55,17 +56,17 @@ pub struct CompareBenchmarksRequest {
 }
 
 impl RunBenchmarkRequest {
-    /// Convert DTO into a `BenchmarkScenario`.
-    pub fn into_scenario(self) -> BenchmarkScenario {
+    /// Convert DTO into a `BenchmarkScenario`, returning an error for unknown backends.
+    pub fn into_scenario(self) -> Result<BenchmarkScenario, ZkDbError> {
         let name = self.name.unwrap_or_else(|| "custom".to_string());
-        let backend = parse_backend_kind(self.backend.as_deref());
+        let backend = parse_backend_kind(&self.backend)?;
         let mut scenario = BenchmarkScenario::new(name, self.sql, self.row_count)
             .with_backend(backend)
             .with_tags(self.tags);
         if let Some(cs) = self.chunk_size {
             scenario = scenario.with_chunk_size(cs);
         }
-        scenario
+        Ok(scenario)
     }
 }
 
@@ -177,11 +178,31 @@ impl From<BenchmarkResult> for BenchmarkResultResponse {
     }
 }
 
-pub fn parse_backend_kind(s: Option<&str>) -> BackendKind {
-    match s {
-        Some("plonky2") => BackendKind::Plonky2,
-        Some("plonky3") => BackendKind::Plonky3,
-        Some("halo2") => BackendKind::Halo2,
-        _ => BackendKind::Mock,
+/// Parse a backend name string into a `BackendKind`.
+///
+/// Returns `Err` for unknown or empty values — callers must propagate this
+/// as a 400 Bad Request. There is no silent fallback to Mock.
+/// Parse a backend name string into a `BackendKind`.
+///
+/// "mock" is no longer valid — MockBackend has been removed.
+/// Returns `Err` for unknown or empty values; callers propagate this as HTTP 400.
+pub fn parse_backend_kind(s: &str) -> Result<BackendKind, ZkDbError> {
+    match s.trim() {
+        "constraint_checked" | "baseline" => Ok(BackendKind::ConstraintChecked),
+        "plonky2" => Ok(BackendKind::Plonky2),
+        "plonky3" => Ok(BackendKind::Plonky3),
+        "halo2" => Ok(BackendKind::Halo2),
+        "mock" => Err(ZkDbError::Schema(
+            "'mock' backend has been removed. \
+             Use 'constraint_checked' for integration testing or 'plonky2' for production ZK proving."
+                .into(),
+        )),
+        "" => Err(ZkDbError::Schema(
+            "backend is required. Valid values: constraint_checked, plonky2".into(),
+        )),
+        other => Err(ZkDbError::Schema(format!(
+            "unknown backend '{}'. Valid values: constraint_checked, plonky2",
+            other
+        ))),
     }
 }

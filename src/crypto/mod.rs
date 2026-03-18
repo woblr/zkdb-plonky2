@@ -1,6 +1,5 @@
 //! Cryptographic primitives.
 
-
 pub trait HashFunction: Send + Sync {
     fn hash(&self, data: &[u8]) -> [u8; 32];
     fn hash2(&self, a: &[u8; 32], b: &[u8; 32]) -> [u8; 32];

@@ -13,8 +13,8 @@ pub mod runner;
 pub mod storage;
 pub mod types;
 
-pub use runner::BenchmarkRunner;
-pub use types::{BenchmarkResult, BenchmarkRunId, BenchmarkScenario};
 pub use compare::BenchmarkComparison;
-pub use storage::BenchmarkStore;
 pub use pack::{BenchmarkPackExporter, CanonicalRowCounts, ReportContext, ReportGenerator};
+pub use runner::BenchmarkRunner;
+pub use storage::BenchmarkStore;
+pub use types::{BenchmarkResult, BenchmarkRunId, BenchmarkScenario};

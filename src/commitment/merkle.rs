@@ -47,7 +47,10 @@ pub struct MerkleTree {
 impl MerkleTree {
     /// Build a Merkle tree from raw leaf data.
     pub fn build(leaf_data: &[[u8; 32]]) -> Self {
-        assert!(!leaf_data.is_empty(), "MerkleTree requires at least one leaf");
+        assert!(
+            !leaf_data.is_empty(),
+            "MerkleTree requires at least one leaf"
+        );
 
         let n = leaf_data.len().next_power_of_two();
         let mut leaves: Vec<[u8; 32]> = leaf_data.to_vec();
@@ -96,7 +99,7 @@ impl MerkleTree {
         let mut current_idx = index;
 
         for level in &self.levels[..self.levels.len() - 1] {
-            let sibling_idx = if current_idx % 2 == 0 {
+            let sibling_idx = if current_idx.is_multiple_of(2) {
                 current_idx + 1
             } else {
                 current_idx - 1

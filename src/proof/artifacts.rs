@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProofSystemKind {
-    /// No proof system. Used by MockBackend.
+    /// No proof system. Used as a sentinel in invalid/error results.
     /// - is_zero_knowledge: false
     /// - is_succinct: false
     /// - has_real_constraints: false
@@ -68,7 +68,10 @@ impl ProofSystemKind {
     /// Whether real operator constraints (sort order, group boundaries, etc.)
     /// are enforced during proving.
     pub fn has_real_constraints(&self) -> bool {
-        matches!(self, Self::HashChainAudit | Self::Plonky2Snark | Self::Halo2Snark)
+        matches!(
+            self,
+            Self::HashChainAudit | Self::Plonky2Snark | Self::Halo2Snark
+        )
     }
 
     /// Whether a polynomial commitment scheme is used.
@@ -79,14 +82,12 @@ impl ProofSystemKind {
     /// Human-readable summary for display in benchmark output and API responses.
     pub fn display_summary(&self) -> &'static str {
         match self {
-            Self::None =>
-                "No proof system (mock/stub only)",
-            Self::HashChainAudit =>
-                "Hash-chain audit (real constraints, NOT zero-knowledge, NOT succinct)",
-            Self::Plonky2Snark =>
-                "Plonky2 SNARK (FRI-based, Goldilocks, zero-knowledge, succinct)",
-            Self::Halo2Snark =>
-                "Halo2 SNARK (IPA/KZG, zero-knowledge, succinct)",
+            Self::None => "No proof system (mock/stub only)",
+            Self::HashChainAudit => {
+                "Hash-chain audit (real constraints, NOT zero-knowledge, NOT succinct)"
+            }
+            Self::Plonky2Snark => "Plonky2 SNARK (FRI-based, Goldilocks, zero-knowledge, succinct)",
+            Self::Halo2Snark => "Halo2 SNARK (IPA/KZG, zero-knowledge, succinct)",
         }
     }
 }
@@ -100,8 +101,104 @@ impl ProofSystemKind {
 pub struct PublicInputs {
     pub snapshot_root: [u8; 32],
     pub query_hash: [u8; 32],
+    /// **Blake3 metadata-only commitment. NOT circuit-proved.**
+    ///
+    /// This is `Blake3(snapshot_root ‖ query_hash ‖ result_commitment_from_witness ‖ proof_prefix)`.
+    /// It is computed *outside* any circuit and cannot be verified by the SNARK.
+    /// Do NOT use this as the authoritative result commitment.
+    ///
+    /// The circuit-proved result commitment is `result_commit_lo` (Poseidon, PI[4]/[5]/[6]
+    /// depending on circuit). Use that for security-critical checks.
     pub result_commitment: [u8; 32],
     pub result_row_count: u64,
+    /// AggCircuit PI[2]: sum of selected values.
+    /// Cross-checked against proof PI[2] in verify().
+    #[serde(default)]
+    pub result_sum: u64,
+    /// **Primary circuit-proved result commitment (Poseidon, in-circuit).**
+    ///
+    /// Layout per circuit:
+    /// - AggCircuit:     PI[4] = Poseidon(sum_vals, count_sel)[0]
+    /// - SortCircuit:    PI[4] = Poseidon(sum_sel, count_sel)[0]
+    /// - DescSortCircuit: PI[4] = Poseidon(sum_sel, count_sel)[0]
+    /// - GroupByCircuit: PI[6] = Poseidon(sum_vals, count_sel)[0]
+    /// - JoinCircuit:    PI[5] = Poseidon(sum_vals, count)[0]
+    ///
+    /// This value is computed inside the circuit; the prover cannot alter the underlying
+    /// aggregation result without invalidating the proof. Use this for all security-critical
+    /// checks — not `result_commitment` (Blake3 metadata-only).
+    #[serde(default)]
+    pub result_commit_lo: u64,
+    /// GROUP BY circuits only: Poseidon(out_keys_padded ++ group_sums_padded ++ boundary_flags_padded)[0].
+    /// `group_sums_padded[i]` is the running per-group aggregate sum at position i —
+    /// it resets at each group boundary and accumulates within a group.
+    /// Circuit-constrained as PI[5] in GroupByCircuit. Zero for non-GroupBy proofs.
+    #[serde(default)]
+    pub group_output_lo: u64,
+    /// JOIN circuits only: Poseidon(right_keys_padded)[0].
+    /// Circuit-constrained as PI[4] in JoinCircuit. Zero for non-Join proofs.
+    #[serde(default)]
+    pub join_right_snap_lo: u64,
+    /// JOIN circuits only: number of unmatched (sel=0) rows — PI[6] in JoinCircuit.
+    /// Circuit-constrained; the prover cannot misreport the number of unmatched rows.
+    /// Zero for non-Join proofs or all-matched joins.
+    #[serde(default)]
+    pub join_unmatched_count: u64,
+    /// AggCircuit only: PI[5] = predicate operation code.
+    /// 0 = None (all rows selected), 1 = Eq, 2 = Lt, 3 = Gt.
+    /// Circuit-constrained — prover cannot claim a different pred_op.
+    /// Zero for non-aggregate proofs.
+    #[serde(default)]
+    pub pred_op: u64,
+    /// AggCircuit only: PI[6] = predicate target value.
+    /// The field element against which the predicate is evaluated.
+    /// Circuit-constrained — prover cannot substitute a different value.
+    /// Zero for non-aggregate proofs or pred_op=None.
+    #[serde(default)]
+    pub pred_val: u64,
+    /// Sort circuits only: PI[5] = Poseidon(in_secondary_padded)[0].
+    /// Sort / DescSort circuits only — 128-bit payload binding (lo half):
+    ///   PI[5] = Poseidon(in_secondary_lo_padded)[0]
+    ///
+    /// The per-row fingerprint lo = Poseidon(row_bytes).elements[0].
+    /// Combined with `sort_secondary_hi_snap_lo`, this commits a ~128-bit fingerprint
+    /// of every payload row to the proof, preventing row-substitution after sorting.
+    /// Zero when no secondary column was provided (degenerates to key-only grand-product).
+    #[serde(default)]
+    pub sort_secondary_snap_lo: u64,
+    /// Sort / DescSort circuits only — 128-bit payload binding (hi half):
+    ///   PI[6] = Poseidon(in_secondary_hi_padded)[0]
+    ///
+    /// The per-row fingerprint hi = Poseidon(row_bytes).elements[1].
+    /// Together with `sort_secondary_snap_lo` this raises collision resistance to ~128 bits.
+    /// Zero for legacy artifacts that were proved with the single-element circuit.
+    #[serde(default)]
+    pub sort_secondary_hi_snap_lo: u64,
+    /// GROUP BY circuits only: PI[7] = Poseidon(vals_t_padded)[0].
+    ///
+    /// Binds the **value column** (the column used for SUM/AVG) to the proof.
+    /// Without this, a prover could keep `in_keys` intact (satisfying PI[0] = snap_lo)
+    /// while substituting arbitrary values in the aggregation column.
+    ///
+    /// This commitment covers the same padded layout as `snap_lo` (in_keys):
+    /// both use MAX_ROWS-padded arrays, so `group_vals_snap_lo` == `snap_lo` only when
+    /// the key and value columns happen to be identical.
+    ///
+    /// Zero for non-GroupBy proofs or legacy artifacts that predate this field.
+    #[serde(default)]
+    pub group_vals_snap_lo: u64,
+    /// AggCircuit only: PI[7] = n_real (number of non-padded rows in the dataset).
+    ///
+    /// This value is circuit-proved, closing both the Lt/Gt undercounting attack
+    /// (prover can no longer skip real satisfying rows) and the Eq pred_val=0 COUNT
+    /// inflation attack (padded rows are unconditionally forced to selector = 0).
+    ///
+    /// The verifier cross-checks this field against proof PI[7] to ensure consistency
+    /// with the artifact's recorded n_real value.
+    ///
+    /// Zero for non-Agg proofs or legacy artifacts that predate this field.
+    #[serde(default)]
+    pub agg_n_real: u64,
 }
 
 impl PublicInputs {
@@ -113,6 +210,49 @@ impl PublicInputs {
 // ─────────────────────────────────────────────────────────────────────────────
 // Proof artifact
 // ─────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProofScope {
+    SingleOperator,
+    Composed,
+    Partial,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DatasetBinding {
+    Full,
+    Partial,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResultCommitmentKind {
+    PoseidonProved,
+    Blake3MetadataOnly,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofCapabilities {
+    pub proof_scope: ProofScope,
+    pub dataset_binding: DatasetBinding,
+    pub join_completeness_proved: bool,
+    pub group_output_decomposed: bool,
+    pub result_commitment_kind: ResultCommitmentKind,
+}
+
+impl Default for ProofCapabilities {
+    fn default() -> Self {
+        Self {
+            proof_scope: ProofScope::SingleOperator,
+            dataset_binding: DatasetBinding::Full,
+            join_completeness_proved: true,
+            group_output_decomposed: false,
+            result_commitment_kind: ResultCommitmentKind::Blake3MetadataOnly,
+        }
+    }
+}
 
 /// The serializable output of a proving operation.
 ///
@@ -126,6 +266,8 @@ pub struct ProofArtifact {
     pub backend: BackendTag,
     /// Explicit label on the proof system used. Do not infer from `backend`.
     pub proof_system: ProofSystemKind,
+    #[serde(default)]
+    pub capabilities: ProofCapabilities,
     pub proof_bytes: Vec<u8>,
     pub public_inputs: PublicInputs,
     pub verification_key_bytes: Vec<u8>,
@@ -143,6 +285,65 @@ impl ProofArtifact {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// External anchor status
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Describes whether the proof's snapshot binding was verified against an
+/// *external* manifest anchor (e.g. a published `poseidon_snap_lo`).
+///
+/// ## Why this matters
+///
+/// A circuit proof is internally self-consistent: it proves that the prover
+/// knew values whose Poseidon hash equals `PI[0]`.  But it does NOT prove that
+/// `PI[0]` matches the commitment published in the dataset manifest.
+///
+/// An external anchor check ties the proof to a specific manifest, making it
+/// possible to distinguish "proof is internally valid" from "proof is valid
+/// **and** binds to the publicly committed dataset".
+///
+/// ## Encoding mismatch warning
+///
+/// The dataset manifest may store `poseidon_snap_lo` computed from raw row
+/// bytes (first-8-bytes-as-LE-u64 per row).  When a schema is present,
+/// `WitnessBuilder` may use schema-decoded column values instead.  These two
+/// encodings produce **different** `snap_lo` values even for the same dataset.
+/// If the manifest's `poseidon_snap_lo` was computed from raw bytes but the
+/// circuit was proved with schema-decoded values, the external anchor check
+/// will report `EncodingMismatch` rather than `Mismatch`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExternalAnchorStatus {
+    /// No external anchor was provided; the check was skipped.
+    /// The proof is internally self-consistent but not externally anchored.
+    Unanchored,
+
+    /// The proof's `snap_lo` (PI[0]) was verified against the manifest's
+    /// `poseidon_snap_lo` and they match.
+    Anchored,
+
+    /// An external anchor was provided but the values do not match.
+    /// This is a hard failure — either the proof is for a different dataset
+    /// or the anchor value is wrong.
+    Mismatch {
+        expected_snap_lo: u64,
+        proof_snap_lo: u64,
+    },
+
+    /// The manifest and circuit use different encoding conventions for snap_lo.
+    /// The mismatch is expected and does NOT indicate fraud; it indicates that
+    /// the manifest was built with raw-bytes encoding while the circuit was
+    /// proved with schema-decoded column values (or vice versa).
+    /// Consumers should re-compute snap_lo with the same encoding as the circuit.
+    EncodingMismatch,
+}
+
+impl Default for ExternalAnchorStatus {
+    fn default() -> Self {
+        Self::Unanchored
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Verification result
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -151,11 +352,38 @@ pub struct VerificationResult {
     pub is_valid: bool,
     pub snapshot_root: [u8; 32],
     pub query_hash: [u8; 32],
+    /// **Blake3 metadata-only commitment. NOT circuit-proved.**
+    /// See `result_commit_poseidon_lo` for the circuit-proved Poseidon commitment.
     pub result_commitment: [u8; 32],
+    /// **Circuit-proved result commitment (Poseidon, u64).**
+    /// Extracted directly from the proof's public inputs (PI[4]/[5]/[6] depending on circuit).
+    /// This is the authoritative security-critical commitment.
+    /// Zero when the circuit does not produce a Poseidon result commitment (non-Plonky2 backends).
+    #[serde(default)]
+    pub result_commit_poseidon_lo: u64,
     pub backend: BackendTag,
     /// Proof system used — same label as in the artifact.
     pub proof_system: ProofSystemKind,
+    #[serde(default)]
+    pub capabilities: ProofCapabilities,
     pub error: Option<String>,
+    /// Non-fatal warnings about semantic guarantees that are NOT cryptographically proved.
+    /// A valid proof may still have warnings. Consumers must check this field.
+    #[serde(default)]
+    pub warnings: Vec<String>,
+    /// True only when the proof system fully proves the completeness of results.
+    /// For JOIN: false until a lookup argument (e.g. Logup) is implemented.
+    /// For all other circuits: true (permutation argument covers completeness).
+    #[serde(default = "bool_true")]
+    pub completeness_proved: bool,
+    /// Whether the proof's snapshot binding was verified against an external manifest anchor.
+    /// Default: `Unanchored` (no external check was performed).
+    #[serde(default)]
+    pub external_anchor_status: ExternalAnchorStatus,
+}
+
+fn bool_true() -> bool {
+    true
 }
 
 impl VerificationResult {
@@ -165,9 +393,37 @@ impl VerificationResult {
             snapshot_root: artifact.public_inputs.snapshot_root,
             query_hash: artifact.public_inputs.query_hash,
             result_commitment: artifact.public_inputs.result_commitment,
+            result_commit_poseidon_lo: artifact.public_inputs.result_commit_lo,
             backend: artifact.backend.clone(),
             proof_system: artifact.proof_system.clone(),
+            capabilities: artifact.capabilities.clone(),
             error: None,
+            warnings: vec![],
+            completeness_proved: artifact.capabilities.join_completeness_proved,
+            external_anchor_status: ExternalAnchorStatus::Unanchored,
+        }
+    }
+
+    /// Construct a valid result with non-fatal semantic warnings.
+    pub fn valid_with_warnings(
+        artifact: &ProofArtifact,
+        warnings: Vec<String>,
+        completeness_proved: bool,
+        external_anchor_status: ExternalAnchorStatus,
+    ) -> Self {
+        Self {
+            is_valid: true,
+            snapshot_root: artifact.public_inputs.snapshot_root,
+            query_hash: artifact.public_inputs.query_hash,
+            result_commitment: artifact.public_inputs.result_commitment,
+            result_commit_poseidon_lo: artifact.public_inputs.result_commit_lo,
+            backend: artifact.backend.clone(),
+            proof_system: artifact.proof_system.clone(),
+            capabilities: artifact.capabilities.clone(),
+            error: None,
+            warnings,
+            completeness_proved,
+            external_anchor_status,
         }
     }
 
@@ -177,9 +433,14 @@ impl VerificationResult {
             snapshot_root: [0u8; 32],
             query_hash: [0u8; 32],
             result_commitment: [0u8; 32],
+            result_commit_poseidon_lo: 0,
             backend: BackendTag::Mock,
             proof_system: ProofSystemKind::None,
+            capabilities: ProofCapabilities::default(),
             error: Some(reason.into()),
+            warnings: vec![],
+            completeness_proved: false,
+            external_anchor_status: ExternalAnchorStatus::Unanchored,
         }
     }
 
@@ -194,9 +455,14 @@ impl VerificationResult {
             snapshot_root: [0u8; 32],
             query_hash: [0u8; 32],
             result_commitment: [0u8; 32],
+            result_commit_poseidon_lo: 0,
             backend,
             proof_system,
+            capabilities: ProofCapabilities::default(),
             error: Some(reason.into()),
+            warnings: vec![],
+            completeness_proved: false,
+            external_anchor_status: ExternalAnchorStatus::Unanchored,
         }
     }
 }
@@ -226,7 +492,9 @@ pub struct InMemoryProofStore {
 
 impl InMemoryProofStore {
     pub fn new() -> Self {
-        Self { proofs: Arc::new(DashMap::new()) }
+        Self {
+            proofs: Arc::new(DashMap::new()),
+        }
     }
 
     pub fn save(&self, artifact: ProofArtifact) {
@@ -250,5 +518,7 @@ impl InMemoryProofStore {
 }
 
 impl Default for InMemoryProofStore {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

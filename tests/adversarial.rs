@@ -25,9 +25,9 @@ use zkdb_plonky2::{
     circuit::witness::{ColumnTrace, WitnessTrace},
     commitment::{poseidon::compute_snap_lo, root::CommitmentRoot},
     field::FieldElement,
-    proof::artifacts::{ProofSystemKind},
+    proof::artifacts::ProofSystemKind,
     query::proof_plan::{
-        AggregationTopology, ProofOperator, ProofPlan, ProvingTask, TaskId,
+        AggregationTopology, OperatorParams, ProofOperator, ProofPlan, ProvingTask, TaskId,
     },
     types::{BackendTag, DatasetId, ProofId, QueryId, SnapshotId},
 };
@@ -54,6 +54,9 @@ fn make_plan(op: ProofOperator) -> ProofPlan {
             root_task_id: tid,
         },
         leaf_count: 1,
+        poseidon_snap_lo: 0,
+        operator_params: OperatorParams::default(),
+        schema_json: None,
     }
 }
 
@@ -84,7 +87,10 @@ fn sorted_witness(n: usize) -> WitnessTrace {
 fn group_witness() -> WitnessTrace {
     let mut w = WitnessTrace::new(QueryId::new(), SnapshotId::new());
     let keys: Vec<FieldElement> = vec![1, 1, 2, 2, 3].into_iter().map(FieldElement).collect();
-    let vals: Vec<FieldElement> = vec![10, 20, 30, 40, 50].into_iter().map(FieldElement).collect();
+    let vals: Vec<FieldElement> = vec![10, 20, 30, 40, 50]
+        .into_iter()
+        .map(FieldElement)
+        .collect();
     w.input_columns = vec![ColumnTrace::new("__row_hash_input", keys.clone())];
     w.columns = vec![
         ColumnTrace::new("group_key", keys),
@@ -100,7 +106,7 @@ fn join_witness_matching(n: usize) -> WitnessTrace {
     let mut w = WitnessTrace::new(QueryId::new(), SnapshotId::new());
     let keys: Vec<FieldElement> = (0..n).map(|i| FieldElement(i as u64)).collect();
     w.columns = vec![
-        ColumnTrace::new("left_key",  keys.clone()),
+        ColumnTrace::new("left_key", keys.clone()),
         ColumnTrace::new("right_key", keys),
     ];
     w.result_row_count = n as u64;
@@ -115,7 +121,10 @@ fn join_witness_matching(n: usize) -> WitnessTrace {
 #[tokio::test]
 async fn tampered_proof_bytes_fails_verification() {
     let b = ConstraintCheckedBackend::new();
-    let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+    let plan = make_plan(ProofOperator::Scan {
+        chunk_indices: vec![0],
+        column_names: None,
+    });
     let circuit = b.compile_circuit(&plan).await.unwrap();
     let mut artifact = b.prove(circuit.as_ref(), &scan_witness(5)).await.unwrap();
 
@@ -134,7 +143,10 @@ async fn tampered_proof_bytes_fails_verification() {
 #[tokio::test]
 async fn tampered_result_commitment_fails_verification() {
     let b = ConstraintCheckedBackend::new();
-    let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+    let plan = make_plan(ProofOperator::Scan {
+        chunk_indices: vec![0],
+        column_names: None,
+    });
     let circuit = b.compile_circuit(&plan).await.unwrap();
     let mut artifact = b.prove(circuit.as_ref(), &scan_witness(5)).await.unwrap();
 
@@ -151,7 +163,10 @@ async fn tampered_result_commitment_fails_verification() {
 #[tokio::test]
 async fn tampered_snapshot_root_fails_verification() {
     let b = ConstraintCheckedBackend::new();
-    let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+    let plan = make_plan(ProofOperator::Scan {
+        chunk_indices: vec![0],
+        column_names: None,
+    });
     let circuit = b.compile_circuit(&plan).await.unwrap();
     let mut artifact = b.prove(circuit.as_ref(), &scan_witness(5)).await.unwrap();
 
@@ -168,7 +183,10 @@ async fn tampered_snapshot_root_fails_verification() {
 #[tokio::test]
 async fn tampered_query_hash_fails_verification() {
     let b = ConstraintCheckedBackend::new();
-    let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+    let plan = make_plan(ProofOperator::Scan {
+        chunk_indices: vec![0],
+        column_names: None,
+    });
     let circuit = b.compile_circuit(&plan).await.unwrap();
     let mut artifact = b.prove(circuit.as_ref(), &scan_witness(5)).await.unwrap();
 
@@ -185,7 +203,9 @@ async fn tampered_query_hash_fails_verification() {
 #[tokio::test]
 async fn unsorted_witness_fails_sort_prove() {
     let b = ConstraintCheckedBackend::new();
-    let plan = make_plan(ProofOperator::Sort { keys_json: "[]".into() });
+    let plan = make_plan(ProofOperator::Sort {
+        keys_json: "[]".into(),
+    });
     let circuit = b.compile_circuit(&plan).await.unwrap();
 
     // [5, 3, 1, 4, 2] — neither ascending nor descending
@@ -202,7 +222,8 @@ async fn unsorted_witness_fails_sort_prove() {
     let msg = format!("{}", result.unwrap_err());
     assert!(
         msg.contains("constraint validation failed"),
-        "error must mention constraint validation: {}", msg
+        "error must mention constraint validation: {}",
+        msg
     );
 }
 
@@ -213,13 +234,16 @@ async fn unsorted_witness_fails_sort_prove() {
 #[tokio::test]
 async fn sort_multiset_violation_fails_prove() {
     let b = ConstraintCheckedBackend::new();
-    let plan = make_plan(ProofOperator::Sort { keys_json: "[]".into() });
+    let plan = make_plan(ProofOperator::Sort {
+        keys_json: "[]".into(),
+    });
     let circuit = b.compile_circuit(&plan).await.unwrap();
 
     // Input: [1, 3, 5, 7, 9] (pre-sort)
     // Output: [1, 2, 5, 7, 9] — valid sort order but 2 was injected (replaced 3)
     let input_vals: Vec<FieldElement> = vec![1, 3, 5, 7, 9].into_iter().map(FieldElement).collect();
-    let output_vals: Vec<FieldElement> = vec![1, 2, 5, 7, 9].into_iter().map(FieldElement).collect();
+    let output_vals: Vec<FieldElement> =
+        vec![1, 2, 5, 7, 9].into_iter().map(FieldElement).collect();
 
     let mut w = WitnessTrace::new(QueryId::new(), SnapshotId::new());
     w.input_columns = vec![ColumnTrace::new("__row_hash_input", input_vals)];
@@ -232,7 +256,8 @@ async fn sort_multiset_violation_fails_prove() {
     let msg = format!("{}", result.unwrap_err());
     assert!(
         msg.contains("constraint validation failed"),
-        "error must mention constraint validation: {}", msg
+        "error must mention constraint validation: {}",
+        msg
     );
 }
 
@@ -263,7 +288,8 @@ async fn unsorted_group_key_fails_prove() {
     let msg = format!("{}", result.unwrap_err());
     assert!(
         msg.contains("constraint validation failed"),
-        "error must mention constraint validation: {}", msg
+        "error must mention constraint validation: {}",
+        msg
     );
 }
 
@@ -283,7 +309,8 @@ async fn group_by_multiset_violation_fails_prove() {
     // Input: [1, 1, 2, 3] — original multiset
     // Output: [1, 1, 2, 4] — 4 was injected (replaced 3), but still sorted
     let input_vals: Vec<FieldElement> = vec![1u64, 1, 2, 3].into_iter().map(FieldElement).collect();
-    let output_vals: Vec<FieldElement> = vec![1u64, 1, 2, 4].into_iter().map(FieldElement).collect();
+    let output_vals: Vec<FieldElement> =
+        vec![1u64, 1, 2, 4].into_iter().map(FieldElement).collect();
 
     let mut w = WitnessTrace::new(QueryId::new(), SnapshotId::new());
     w.input_columns = vec![ColumnTrace::new("__row_hash_input", input_vals)];
@@ -296,7 +323,8 @@ async fn group_by_multiset_violation_fails_prove() {
     let msg = format!("{}", result.unwrap_err());
     assert!(
         msg.contains("constraint validation failed"),
-        "error must mention constraint validation: {}", msg
+        "error must mention constraint validation: {}",
+        msg
     );
 }
 
@@ -314,12 +342,12 @@ async fn join_key_mismatch_fails_prove() {
     let circuit = b.compile_circuit(&plan).await.unwrap();
 
     // Row 2: left_key=5 but right_key=99 — mismatch
-    let left_keys: Vec<FieldElement>  = vec![1, 2, 5].into_iter().map(FieldElement).collect();
+    let left_keys: Vec<FieldElement> = vec![1, 2, 5].into_iter().map(FieldElement).collect();
     let right_keys: Vec<FieldElement> = vec![1, 2, 99].into_iter().map(FieldElement).collect();
 
     let mut w = WitnessTrace::new(QueryId::new(), SnapshotId::new());
     w.columns = vec![
-        ColumnTrace::new("left_key",  left_keys),
+        ColumnTrace::new("left_key", left_keys),
         ColumnTrace::new("right_key", right_keys),
     ];
     w.result_row_count = 3;
@@ -330,7 +358,8 @@ async fn join_key_mismatch_fails_prove() {
     let msg = format!("{}", result.unwrap_err());
     assert!(
         msg.contains("constraint validation failed"),
-        "error must mention constraint validation: {}", msg
+        "error must mention constraint validation: {}",
+        msg
     );
 }
 
@@ -348,12 +377,12 @@ async fn join_column_length_mismatch_fails_prove() {
     let circuit = b.compile_circuit(&plan).await.unwrap();
 
     // left_key has 3 rows, right_key has 2 rows
-    let left_keys: Vec<FieldElement>  = vec![1, 2, 3].into_iter().map(FieldElement).collect();
+    let left_keys: Vec<FieldElement> = vec![1, 2, 3].into_iter().map(FieldElement).collect();
     let right_keys: Vec<FieldElement> = vec![1, 2].into_iter().map(FieldElement).collect();
 
     let mut w = WitnessTrace::new(QueryId::new(), SnapshotId::new());
     w.columns = vec![
-        ColumnTrace::new("left_key",  left_keys),
+        ColumnTrace::new("left_key", left_keys),
         ColumnTrace::new("right_key", right_keys),
     ];
     w.result_row_count = 3;
@@ -380,14 +409,17 @@ async fn join_result_row_count_mismatch_fails_prove() {
     let keys: Vec<FieldElement> = vec![1, 2].into_iter().map(FieldElement).collect();
     let mut w = WitnessTrace::new(QueryId::new(), SnapshotId::new());
     w.columns = vec![
-        ColumnTrace::new("left_key",  keys.clone()),
+        ColumnTrace::new("left_key", keys.clone()),
         ColumnTrace::new("right_key", keys),
     ];
     w.result_row_count = 99; // wrong!
     w.result_commitment = *blake3::hash(b"count_lie").as_bytes();
 
     let result = b.prove(circuit.as_ref(), &w).await;
-    assert!(result.is_err(), "wrong result_row_count must fail join prove");
+    assert!(
+        result.is_err(),
+        "wrong result_row_count must fail join prove"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -405,12 +437,24 @@ async fn empty_proof_bytes_fails_verification() {
         snapshot_id: SnapshotId::new(),
         backend: BackendTag::ConstraintChecked,
         proof_system: ProofSystemKind::HashChainAudit,
-        proof_bytes: vec![],  // empty!
+        capabilities: Default::default(),
+        proof_bytes: vec![], // empty!
         public_inputs: PublicInputs {
             snapshot_root: [0u8; 32],
             query_hash: [0u8; 32],
             result_commitment: [0u8; 32],
             result_row_count: 0,
+            result_sum: 0,
+            result_commit_lo: 0,
+            group_output_lo: 0,
+            join_right_snap_lo: 0,
+            join_unmatched_count: 0,
+            pred_op: 0,
+            pred_val: 0,
+            sort_secondary_snap_lo: 0,
+            sort_secondary_hi_snap_lo: 0,
+            group_vals_snap_lo: 0,
+            agg_n_real: 0,
         },
         verification_key_bytes: vec![],
         created_at_ms: 0,
@@ -427,7 +471,10 @@ async fn empty_proof_bytes_fails_verification() {
 #[tokio::test]
 async fn valid_witness_proves_and_verifies() {
     let b = ConstraintCheckedBackend::new();
-    let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+    let plan = make_plan(ProofOperator::Scan {
+        chunk_indices: vec![0],
+        column_names: None,
+    });
     let circuit = b.compile_circuit(&plan).await.unwrap();
     let artifact = b.prove(circuit.as_ref(), &scan_witness(10)).await.unwrap();
 
@@ -464,22 +511,34 @@ async fn plonky2_backend_proves_real_snark() {
     witness.snapshot_root[..8].copy_from_slice(&snap_lo.to_le_bytes());
 
     let result = b.prove(circuit.as_ref(), &witness).await;
-    assert!(result.is_ok(), "Plonky2 real backend must prove successfully: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Plonky2 real backend must prove successfully: {:?}",
+        result.err()
+    );
 
     let artifact = result.unwrap();
-    assert!(!artifact.proof_bytes.is_empty(), "proof bytes must be non-empty");
+    assert!(
+        !artifact.proof_bytes.is_empty(),
+        "proof bytes must be non-empty"
+    );
     assert!(
         artifact.proof_bytes.len() > 1000,
-        "Plonky2 FRI proof must exceed 1 KB, got {} bytes", artifact.proof_bytes.len()
+        "Plonky2 FRI proof must exceed 1 KB, got {} bytes",
+        artifact.proof_bytes.len()
     );
     assert_eq!(
-        artifact.proof_system, ProofSystemKind::Plonky2Snark,
+        artifact.proof_system,
+        ProofSystemKind::Plonky2Snark,
         "proof system label must be Plonky2Snark"
     );
 
     // Verify the proof
     let verification = b.verify(&artifact).await.unwrap();
-    assert!(verification.is_valid, "real Plonky2 proof must verify successfully");
+    assert!(
+        verification.is_valid,
+        "real Plonky2 proof must verify successfully"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -489,7 +548,10 @@ async fn plonky2_backend_proves_real_snark() {
 #[tokio::test]
 async fn constraint_checked_never_labeled_as_real_snark() {
     let b = ConstraintCheckedBackend::new();
-    let plan = make_plan(ProofOperator::Scan { chunk_indices: vec![0], column_names: None });
+    let plan = make_plan(ProofOperator::Scan {
+        chunk_indices: vec![0],
+        column_names: None,
+    });
     let circuit = b.compile_circuit(&plan).await.unwrap();
     let artifact = b.prove(circuit.as_ref(), &scan_witness(3)).await.unwrap();
 
@@ -510,4 +572,58 @@ async fn constraint_checked_never_labeled_as_real_snark() {
         "ConstraintChecked MUST have real constraints"
     );
     assert_eq!(artifact.proof_system, ProofSystemKind::HashChainAudit);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 16. Plonky2 tampered qhash_lo in artifact fails verify (PI[1] cross-check)
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn plonky2_tampered_qhash_fails_verify() {
+    use zkdb_plonky2::backend::Plonky2Backend;
+    use zkdb_plonky2::commitment::poseidon::compute_snap_lo;
+
+    const MAX_ROWS: usize = 128;
+
+    let b = Plonky2Backend::new();
+    let plan = make_plan(ProofOperator::PartialAggregate {
+        group_by_json: "[]".into(),
+        aggregates_json: r#"[{"kind":"count","column":"*"}]"#.into(),
+    });
+    let circuit = b.compile_circuit(&plan).await.expect("compile failed");
+
+    // Build a valid witness with correct snap_lo
+    let values: Vec<u64> = vec![1u64; 10];
+    let snap_lo = compute_snap_lo(MAX_ROWS, &values);
+
+    let mut witness = WitnessTrace::new(QueryId::new(), SnapshotId::new());
+    witness.snapshot_root[..8].copy_from_slice(&snap_lo.to_le_bytes());
+    witness.query_hash = [2u8; 32];
+    witness.columns = vec![ColumnTrace::new(
+        "__primary",
+        values
+            .iter()
+            .map(|&v| zkdb_plonky2::field::FieldElement(v))
+            .collect(),
+    )];
+    witness.selected = vec![true; 10];
+    witness.result_row_count = 10;
+
+    let mut artifact = b
+        .prove(circuit.as_ref(), &witness)
+        .await
+        .expect("prove failed");
+
+    // Tamper the query_hash in the artifact's public inputs (changes qhash_lo)
+    artifact.public_inputs.query_hash[0] ^= 0xFF;
+    artifact.public_inputs.query_hash[1] ^= 0xAB;
+
+    let result = b.verify(&artifact).await.expect("verify must not panic");
+    // Either the PI[1] cross-check rejects (qhash mismatch) or proof bytes
+    // don't match the tampered public inputs — either way, must be invalid.
+    assert!(
+        !result.is_valid,
+        "tampered qhash in Plonky2 artifact must fail verification; error={:?}",
+        result.error
+    );
 }
