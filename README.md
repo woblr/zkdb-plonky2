@@ -1,4 +1,4 @@
-# zkDB — Verifiable Database with Real Plonky2 FRI-based SNARK Proving
+# zkDB — Zero Knowledge Database with Plonky2 FRI-based SNARK Proving
 
 zkDB is a Rust library and server that implements a **verifiable database pipeline**: ingest rows into typed datasets, commit snapshots to a Poseidon-keyed Merkle structure, execute SQL queries, and generate **real Plonky2 SNARK proofs** over query results. The system is designed as a benchmark and comparison platform for proving backends on database workloads.
 
