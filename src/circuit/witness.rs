@@ -540,13 +540,38 @@ impl WitnessBuilder {
     /// Return the root operator of the proof plan.
     fn root_operator(plan: &ProofPlan) -> &ProofOperator {
         let root_id = &plan.topology.root_task_id;
-        plan.topology
+        let root = plan.topology
             .tasks
             .iter()
             .find(|t| &t.task_id == root_id)
-            .map(|t| &t.operator)
-            .or_else(|| plan.topology.tasks.last().map(|t| &t.operator))
-            .expect("proof plan has no tasks")
+            .or_else(|| plan.topology.tasks.last())
+            .expect("proof plan has no tasks");
+
+        // When the physical plan root is a Projection wrapper, the circuit operator
+        // is the first MergeAggregate / PartialAggregate / Sort / HashJoin below it.
+        // Without this skip, WitnessBuilder falls into the `_ =>` branch and uses
+        // the first schema column with no filter — producing wrong results for ALL
+        // aggregate and sort queries that have a SELECT projection list.
+        match &root.operator {
+            ProofOperator::Projection { .. } => {
+                // Projection is a SELECT wrapper; the actual circuit operator is below it.
+                plan.topology
+                    .tasks
+                    .iter()
+                    .find(|t| {
+                        matches!(
+                            &t.operator,
+                            ProofOperator::MergeAggregate { .. }
+                                | ProofOperator::PartialAggregate { .. }
+                                | ProofOperator::Sort { .. }
+                                | ProofOperator::HashJoin { .. }
+                        )
+                    })
+                    .map(|t| &t.operator)
+                    .unwrap_or(&root.operator)
+            }
+            _ => &root.operator,
+        }
     }
 }
 

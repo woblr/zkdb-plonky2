@@ -1566,28 +1566,70 @@ impl ProvingBackend for Plonky2Backend {
             }
         }
 
+        // ── Reject TEXT/variable-width columns for Sort and GroupBy ─────────
+        // Variable-width columns (Text, Bytes) decode to 0 in decode_column_u64,
+        // meaning all rows get the same key → sort is trivial and grouping is wrong.
+        // Reject these explicitly rather than silently producing wrong proofs.
+        if let Some(schema_str) = &plan.schema_json {
+            if let Ok(schema) = serde_json::from_str::<crate::database::schema::DatasetSchema>(schema_str) {
+                let is_varwidth = |col_name: &str| {
+                    schema.columns.iter()
+                        .find(|c| c.name == col_name)
+                        .map(|c| c.col_type.fixed_byte_width().is_none())
+                        .unwrap_or(false)
+                };
+                if let Some(sort_col) = &plan.operator_params.sort_column {
+                    if is_varwidth(sort_col) {
+                        return Err(ZkDbError::Proving(format!(
+                            "UNSUPPORTED: ORDER BY '{sort_col}' is a TEXT/variable-width column. \
+                             Sort circuits require fixed-width numeric columns. \
+                             Use a numeric column (e.g. salary, amount, score) for ORDER BY."
+                        )));
+                    }
+                }
+                if let Some(gb_col) = &plan.operator_params.group_by_column {
+                    if is_varwidth(gb_col) {
+                        return Err(ZkDbError::Proving(format!(
+                            "UNSUPPORTED: GROUP BY '{gb_col}' is a TEXT/variable-width column. \
+                             GroupBy circuits require fixed-width numeric columns. \
+                             Use a numeric column (e.g. flag, manager_id) for GROUP BY."
+                        )));
+                    }
+                }
+                if let Some(fc) = &plan.operator_params.filter_column {
+                    if is_varwidth(fc) && plan.operator_params.filter_value.is_none() {
+                        return Err(ZkDbError::Proving(format!(
+                            "UNSUPPORTED: WHERE {fc} = '<text>' — TEXT column predicates are not \
+                             circuit-provable. Use a numeric column for WHERE filters."
+                        )));
+                    }
+                }
+            }
+        }
+
         // ── Validate WHERE clause for AggCircuit ────────────────────────────
         // AggCircuit only supports numeric predicates (>, <, =) on the SAME
         // column that is being aggregated.  Reject early with a clear error
         // rather than silently ignoring the WHERE clause or miscounting rows.
         let params = &plan.operator_params;
         if let Some(fc) = &params.filter_column {
-            // String literal predicate: filter_op set but filter_value absent
+            // Predicate with no parseable value: string literal like WHERE col = 'text'
+            // (Bool literals are already converted to 0/1 by extract_operator_params).
+            // Skip this check if the schema TEXT-column check above already caught it.
             if params.filter_op.is_some() && params.filter_value.is_none() {
                 return Err(ZkDbError::Proving(format!(
-                    "UNSUPPORTED: WHERE {fc} = '<string>' — string predicates are not \
-                     circuit-provable. AggCircuit only supports numeric WHERE clauses \
-                     (e.g. WHERE salary > 50000 where salary is a numeric column)."
+                    "UNSUPPORTED: WHERE {fc} = '<non-numeric>' — only numeric/boolean predicates \
+                     are circuit-provable. Use WHERE {fc} > N or WHERE {fc} = N where N is an integer."
                 )));
             }
             // Cross-column filter: filter column ≠ aggregation column
             if let Some(agg_col) = &params.agg_column {
                 if fc != agg_col {
                     return Err(ZkDbError::Proving(format!(
-                        "UNSUPPORTED: WHERE {fc} ... cannot be proved when aggregating '{agg_col}'. \
-                         The filter column must match the aggregation column in AggCircuit \
+                        "UNSUPPORTED: WHERE {fc}=... cannot be proved when aggregating '{agg_col}'. \
+                         Filter column must match aggregation column \
                          (e.g. SUM(salary) WHERE salary > 50000). \
-                         Cross-column filters like SUM(salary) WHERE dept='X' are not yet supported."
+                         Cross-column filter SUM(salary) WHERE dept=X is not yet supported."
                     )));
                 }
             }

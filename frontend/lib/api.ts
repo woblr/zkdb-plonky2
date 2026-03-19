@@ -1,4 +1,6 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+// Use relative paths so Next.js rewrites proxy /v1/* and /health to the Rust backend.
+// The backend runs on port 3001; next.config.ts rewrites forward the requests.
+const BASE = "";
 
 export interface Column {
   name: string;

@@ -315,6 +315,9 @@ impl ProofPlanner {
                         p.filter_value = Some(*n as u64);
                     } else if let crate::query::ast::Expr::Literal(crate::query::ast::Literal::UInt(n)) = &**right {
                         p.filter_value = Some(*n);
+                    } else if let crate::query::ast::Expr::Literal(crate::query::ast::Literal::Bool(b)) = &**right {
+                        // Boolean predicates: true → 1, false → 0 (matches Bool column encoding)
+                        p.filter_value = Some(*b as u64);
                     }
                 }
                 p

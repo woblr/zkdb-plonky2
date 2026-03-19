@@ -13,6 +13,7 @@ import {
   Timer,
   FileDigit,
   ChevronDown,
+  ChevronUp,
   Play,
   RotateCcw,
   CheckCircle2,
@@ -20,6 +21,11 @@ import {
   AlertTriangle,
   Loader2,
   Info,
+  Copy,
+  Check,
+  Code2,
+  Binary,
+  Braces,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,6 +59,237 @@ function truncHex(hex: string, len = 20) {
   return hex.slice(0, len) + "…";
 }
 
+// ─── Copy Button ─────────────────────────────────────────────────────────────
+
+function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "4px 10px",
+        background: copied ? "rgba(0,229,160,0.15)" : "rgba(90,98,130,0.2)",
+        border: `1px solid ${copied ? "rgba(0,229,160,0.4)" : "var(--border)"}`,
+        borderRadius: 4,
+        color: copied ? "var(--accent-green)" : "var(--text-dim)",
+        cursor: "pointer",
+        fontSize: 11,
+        fontFamily: "inherit",
+        transition: "all 0.15s",
+        flexShrink: 0,
+      }}
+    >
+      {copied ? <Check size={11} /> : <Copy size={11} />}
+      {copied ? "Copied!" : label}
+    </button>
+  );
+}
+
+// ─── Proof Explorer ───────────────────────────────────────────────────────────
+
+type ProofTab = "summary" | "hex" | "json" | "bytes";
+
+function ProofExplorer({ proof }: { proof: Proof }) {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<ProofTab>("hex");
+
+  const proofBytes = Math.ceil(proof.proof_hex.length / 2);
+
+  // Build a clean JSON summary object
+  const proofJson = JSON.stringify(
+    {
+      proof_id: proof.proof_id,
+      query_id: proof.query_id,
+      snapshot_id: proof.snapshot_id,
+      backend: proof.backend,
+      proof_system_kind: proof.proof_system_kind,
+      proof_size_bytes: proofBytes,
+      snapshot_root_hex: proof.snapshot_root_hex,
+      query_hash_hex: proof.query_hash_hex,
+      result_commit_poseidon_proved_hex: proof.result_commit_poseidon_proved_hex,
+      unsafe_metadata_commitment_hex: proof.unsafe_metadata_commitment_hex,
+      public_inputs: proof.public_inputs,
+      created_at_ms: proof.created_at_ms,
+    },
+    null,
+    2
+  );
+
+  // Format hex into 16-byte rows with offsets
+  function hexGrid(hex: string) {
+    const lines: string[] = [];
+    for (let i = 0; i < hex.length; i += 32) {
+      const offset = String((i / 2).toString(16).padStart(6, "0"));
+      const chunk = hex.slice(i, i + 32).toUpperCase();
+      const spaced = chunk.match(/.{1,2}/g)?.join(" ") ?? chunk;
+      lines.push(`${offset}  ${spaced}`);
+    }
+    return lines.join("\n");
+  }
+
+  const tabs: { id: ProofTab; label: string; icon: React.ReactNode }[] = [
+    { id: "hex", label: "Hex", icon: <Code2 size={12} /> },
+    { id: "json", label: "JSON", icon: <Braces size={12} /> },
+    { id: "bytes", label: "Byte Grid", icon: <Binary size={12} /> },
+    { id: "summary", label: "Fields", icon: <FileDigit size={12} /> },
+  ];
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%",
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: open ? "8px 8px 0 0" : 8,
+          padding: "10px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+          color: "var(--text)",
+          fontFamily: "inherit",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <FileDigit size={14} style={{ color: "var(--accent-blue)" }} />
+          <span style={{ fontSize: 13, fontWeight: 500 }}>Proof Explorer</span>
+          <span style={{ fontSize: 11, color: "var(--text-dim)", background: "var(--border)", borderRadius: 3, padding: "1px 7px" }}>
+            {(proofBytes / 1024).toFixed(1)} KB · Plonky2 FRI-SNARK
+          </span>
+        </div>
+        {open ? <ChevronUp size={14} style={{ color: "var(--text-dim)" }} /> : <ChevronDown size={14} style={{ color: "var(--text-dim)" }} />}
+      </button>
+
+      {open && (
+        <div
+          style={{
+            background: "#080a0f",
+            border: "1px solid var(--border)",
+            borderTop: "none",
+            borderRadius: "0 0 8px 8px",
+            overflow: "hidden",
+          }}
+        >
+          {/* Tab bar */}
+          <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--surface)" }}>
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "8px 16px",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: tab === t.id ? "2px solid var(--accent-blue)" : "2px solid transparent",
+                  color: tab === t.id ? "var(--accent-blue)" : "var(--text-dim)",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontFamily: "inherit",
+                  transition: "color 0.15s",
+                }}
+              >
+                {t.icon} {t.label}
+              </button>
+            ))}
+            <div style={{ flex: 1 }} />
+            <div style={{ display: "flex", alignItems: "center", padding: "0 12px" }}>
+              <CopyButton
+                text={
+                  tab === "hex" ? proof.proof_hex
+                  : tab === "json" ? proofJson
+                  : tab === "bytes" ? hexGrid(proof.proof_hex)
+                  : proofJson
+                }
+                label={`Copy ${tab === "hex" ? "Hex" : tab === "json" ? "JSON" : tab === "bytes" ? "Grid" : "Fields"}`}
+              />
+            </div>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: "12px 16px", maxHeight: 360, overflowY: "auto" }}>
+            {tab === "hex" && (
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--accent-green)", lineHeight: 1.6, wordBreak: "break-all" }}>
+                <div style={{ color: "var(--text-dim)", fontSize: 10, marginBottom: 8 }}>
+                  Full proof · {proofBytes} bytes · {proof.proof_hex.length} hex chars
+                </div>
+                {proof.proof_hex}
+              </div>
+            )}
+
+            {tab === "json" && (
+              <pre style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "var(--text-dim)", lineHeight: 1.7, margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                <span style={{ color: "#8b949e" }}>{proofJson.split("\n").map((line, i) => {
+                  // Syntax highlight keys and values
+                  const highlighted = line
+                    .replace(/"([^"]+)":/g, '<key>"$1":</key>')
+                    .replace(/: "([^"]*)"(,?)/g, ': <str>"$1"</str>$2')
+                    .replace(/: (\d+)(,?)/g, ': <num>$1</num>$2');
+                  return line;
+                }).join("\n")}</span>
+                {proofJson}
+              </pre>
+            )}
+
+            {tab === "bytes" && (
+              <pre style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "var(--text-dim)", lineHeight: 1.8, margin: 0 }}>
+                <div style={{ color: "var(--text-muted)", marginBottom: 8, fontSize: 9 }}>
+                  OFFSET   00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+                </div>
+                {hexGrid(proof.proof_hex)}
+              </pre>
+            )}
+
+            {tab === "summary" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[
+                  { label: "proof_id", value: proof.proof_id, mono: true },
+                  { label: "query_id", value: proof.query_id, mono: true },
+                  { label: "snapshot_id", value: proof.snapshot_id, mono: true },
+                  { label: "backend", value: proof.backend, mono: false },
+                  { label: "proof_system_kind", value: proof.proof_system_kind, mono: false },
+                  { label: "proof_size_bytes", value: proofBytes.toLocaleString(), mono: false },
+                  { label: "snapshot_root_hex", value: proof.snapshot_root_hex, mono: true },
+                  { label: "query_hash_hex", value: proof.query_hash_hex, mono: true },
+                  { label: "result_commit_poseidon_proved_hex", value: proof.result_commit_poseidon_proved_hex, mono: true },
+                  { label: "unsafe_metadata_commitment_hex", value: proof.unsafe_metadata_commitment_hex, mono: true },
+                ].map(({ label, value, mono }) => (
+                  <div key={label} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "6px 0", borderBottom: "1px solid rgba(90,98,130,0.1)" }}>
+                    <span style={{ fontSize: 11, color: "var(--text-dim)", minWidth: 220, flexShrink: 0 }}>{label}</span>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, minWidth: 0 }}>
+                      <span style={{
+                        fontSize: 11,
+                        fontFamily: mono ? "'JetBrains Mono', monospace" : "inherit",
+                        color: mono ? "var(--accent-blue)" : "var(--text)",
+                        wordBreak: "break-all",
+                        flex: 1,
+                      }}>{value}</span>
+                      <CopyButton text={value} label="Copy" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Detect query type from SQL to show the right result interpretation */
 function detectQueryKind(sql: string): "sum" | "count" | "avg" | "sort" | "groupby" | "join" | "filter" {
   const s = sql.toLowerCase();
@@ -79,6 +316,7 @@ function QueryResultBox({ proof, sql }: { proof: Proof; sql: string }) {
   const pi = proof.public_inputs;
   const sum = proof.result_sum;
   const count = proof.result_row_count;
+  const hasWhere = /\bwhere\b/i.test(sql);
 
   const items: { label: string; value: string; proved: boolean; note?: string }[] = [];
 
@@ -87,24 +325,31 @@ function QueryResultBox({ proof, sql }: { proof: Proof; sql: string }) {
     items.push({ label: "AVG result", value: avg, proved: false, note: "derived: sum ÷ count (off-circuit)" });
     items.push({ label: "SUM (PI[2])", value: sum.toLocaleString(), proved: true, note: "circuit-proved" });
     items.push({ label: "COUNT (PI[3])", value: count.toLocaleString(), proved: true, note: "circuit-proved" });
+    items.push({ label: "n_real (PI[7])", value: pi.agg_n_real.toLocaleString(), proved: false, note: "total rows in dataset" });
   } else if (kind === "sum") {
     items.push({ label: "SUM (PI[2])", value: sum.toLocaleString(), proved: true, note: "circuit-proved" });
-    items.push({ label: "COUNT (PI[3])", value: count.toLocaleString(), proved: true, note: "rows matched" });
+    items.push({ label: "Rows matched (PI[3])", value: count.toLocaleString(), proved: true, note: "circuit-proved" });
+    items.push({ label: "n_real (PI[7])", value: pi.agg_n_real.toLocaleString(), proved: false, note: "total rows in dataset" });
   } else if (kind === "count") {
     items.push({ label: "COUNT (PI[3])", value: count.toLocaleString(), proved: true, note: "circuit-proved" });
+    if (hasWhere && sum > 0) {
+      // With a numeric WHERE filter, PI[2] = sum of the filter column over matched rows
+      items.push({ label: "SUM of filtered col (PI[2])", value: sum.toLocaleString(), proved: true, note: "sum of filter column for matched rows" });
+    }
+    items.push({ label: "n_real (PI[7])", value: pi.agg_n_real.toLocaleString(), proved: false, note: "total rows in dataset" });
   } else if (kind === "sort") {
-    items.push({ label: "Rows sorted (PI[3])", value: count.toLocaleString(), proved: true });
-    items.push({ label: "Sum of sorted col (PI[2])", value: sum.toLocaleString(), proved: true, note: "integrity check" });
+    items.push({ label: "Rows sorted (PI[3])", value: count.toLocaleString(), proved: true, note: "circuit-proved" });
+    items.push({ label: "SUM of col (PI[2])", value: sum.toLocaleString(), proved: true, note: "sum of sorted column — integrity check" });
   } else if (kind === "groupby") {
-    items.push({ label: "Total rows (PI[3])", value: count.toLocaleString(), proved: true });
-    items.push({ label: "Global SUM (PI[2])", value: sum.toLocaleString(), proved: true, note: "circuit-proved" });
+    items.push({ label: "Total rows proved (PI[3])", value: count.toLocaleString(), proved: true });
+    items.push({ label: "Global SUM (PI[2])", value: sum.toLocaleString(), proved: true, note: "sum of agg column across all groups" });
   } else if (kind === "join") {
     items.push({ label: "Matched rows (PI[3])", value: count.toLocaleString(), proved: true });
-    items.push({ label: "Join SUM (PI[2])", value: sum.toLocaleString(), proved: true });
+    items.push({ label: "Left col SUM (PI[2])", value: sum.toLocaleString(), proved: true });
     items.push({ label: "Unmatched rows", value: pi.join_unmatched_count.toLocaleString(), proved: true, note: "PI[6] circuit-proved" });
   } else {
     items.push({ label: "Rows matched (PI[3])", value: count.toLocaleString(), proved: true });
-    items.push({ label: "n_real (PI[7])", value: pi.agg_n_real.toLocaleString(), proved: true, note: "total dataset rows" });
+    items.push({ label: "n_real (PI[7])", value: pi.agg_n_real.toLocaleString(), proved: false, note: "total rows in dataset" });
   }
 
   return (
@@ -168,6 +413,19 @@ function QueryResultBox({ proof, sql }: { proof: Proof; sql: string }) {
 
 function PublicInputsPanel({ pi, sql }: { pi: AllPublicInputs; sql: string }) {
   const kind = detectQueryKind(sql);
+  const hasWhere = /\bwhere\b/i.test(sql);
+
+  // For COUNT(*) without WHERE, PI[2] = sum of first schema column (binding col, not requested)
+  const pi2Active = !(kind === "count" && !hasWhere);
+  const pi2Note = kind === "sort"
+    ? "sum of sorted column — integrity"
+    : kind === "join"
+    ? "sum of left join column"
+    : kind === "count" && !hasWhere
+    ? "⚠ binding col sum — not requested by COUNT(*); ignore this"
+    : kind === "count" && hasWhere
+    ? "sum of filter column over matched rows"
+    : "SUM of selected rows";
 
   const rows: { label: string; value: string; pi: string; note?: string; active?: boolean }[] = [
     {
@@ -185,11 +443,11 @@ function PublicInputsPanel({ pi, sql }: { pi: AllPublicInputs; sql: string }) {
       active: true,
     },
     {
-      label: "result_sum",
+      label: kind === "count" && !hasWhere ? "binding_col_sum (ignored)" : "result_sum",
       value: pi.result_sum.toLocaleString(),
       pi: "PI[2]",
-      note: kind === "sort" ? "sum of sorted column" : kind === "join" ? "sum of join values" : "SUM of selected rows",
-      active: kind !== "sort",
+      note: pi2Note,
+      active: pi2Active,
     },
     {
       label: "result_count",
@@ -915,7 +1173,7 @@ export default function Home() {
               <Shield size={52} style={{ opacity: 0.15 }} />
               <div style={{ fontSize: 14 }}>Select a query and click Run & Prove</div>
               <div style={{ fontSize: 11, maxWidth: 380, textAlign: "center", lineHeight: 1.6 }}>
-                First run creates 200-row demo datasets automatically. Each query generates a real Plonky2 FRI-SNARK proof. The result values (SUM, COUNT, AVG) appear alongside the circuit-proved public inputs.
+                First run creates 100-row demo datasets automatically. Each query generates a real Plonky2 FRI-SNARK proof. Results (SUM, COUNT, AVG) appear alongside circuit-proved public inputs. Use the Proof Explorer to inspect hex, JSON, and byte layout.
               </div>
             </div>
           )}
@@ -996,15 +1254,8 @@ export default function Home() {
                 </div>
               </Section>
 
-              {/* Proof hex */}
-              <Section title={`Proof Bytes — ${fmtBytes(Math.ceil(run.proof.proof_hex.length / 2))}`}>
-                <div style={{ background: "#0a0c10", border: "1px solid var(--border)", borderRadius: 6, padding: "10px 14px", fontSize: 10, color: "var(--text-dim)", wordBreak: "break-all", lineHeight: 1.8, maxHeight: 100, overflowY: "auto" }}>
-                  {run.proof.proof_hex.slice(0, 384)}
-                  <span style={{ color: "var(--text-muted)" }}>
-                    … ({Math.ceil(run.proof.proof_hex.length / 2)} bytes total)
-                  </span>
-                </div>
-              </Section>
+              {/* Proof Explorer */}
+              <ProofExplorer proof={run.proof} />
 
               {/* Verify */}
               <Section title="Verification">
