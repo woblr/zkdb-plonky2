@@ -172,19 +172,23 @@ async fn run_server(bind: String) -> anyhow::Result<()> {
     let snapshot_repo = Arc::new(InMemorySnapshotRepository::new());
     let chunk_store = Arc::new(InMemoryChunkStore::new());
     let commitment_svc = Arc::new(Blake3CommitmentService);
-    let backend_env = std::env::var("ZKDB_BACKEND").unwrap_or_else(|_| "plonky2".to_string());
-    let backend_kind = parse_backend(&backend_env);
-    let backend = make_backend(&backend_kind);
-
-    tracing::info!("Initializing API server with backend: {:?}", backend_kind);
+    let default_backend_env = std::env::var("ZKDB_BACKEND").unwrap_or_else(|_| "plonky2".to_string());
+    tracing::info!("Initializing API server with default backend: {}", default_backend_env);
     let policy_engine = PolicyEngine::new();
+
+    use zkdb_plonky2::backend::{ConstraintCheckedBackend, Plonky2Backend};
+    let backends: Vec<(String, Arc<dyn zkdb_plonky2::backend::ProvingBackend>)> = vec![
+        ("plonky2".to_string(), Arc::new(Plonky2Backend::new())),
+        ("constraint_checked".to_string(), Arc::new(ConstraintCheckedBackend::default())),
+    ];
 
     let state = AppState::new(
         dataset_repo,
         snapshot_repo,
         chunk_store,
         commitment_svc,
-        backend,
+        backends,
+        default_backend_env,
         policy_engine,
     );
 

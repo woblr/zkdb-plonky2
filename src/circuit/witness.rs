@@ -353,11 +353,20 @@ impl WitnessBuilder {
                     trace.group_output_lo = compute_group_output_lo_padded(&sorted_keys_u64, &vals);
                 } else {
                     // Plain aggregate (COUNT/SUM/AVG): AggCircuit binds to values.
-                    // agg_column may be None for COUNT(*) — resolve to first schema column.
+                    //
+                    // Effective column priority:
+                    //   1. agg_column (SUM/AVG target — e.g. "salary")
+                    //   2. filter_column (COUNT(*) WHERE col > val — filter col drives binding)
+                    //   3. first schema column (COUNT(*) with no WHERE)
+                    //
+                    // This allows COUNT(*) WHERE amount > 50000 to work: the circuit
+                    // runs the predicate over the `amount` column even though there is no
+                    // explicit aggregation column.
                     let agg_col_resolved: Option<String> = params
                         .agg_column
                         .clone()
                         .filter(|n| !n.is_empty())
+                        .or_else(|| params.filter_column.clone().filter(|n| !n.is_empty()))
                         .or_else(|| {
                             schema
                                 .as_ref()
@@ -372,10 +381,15 @@ impl WitnessBuilder {
                     trace.snapshot_root[..8].copy_from_slice(&snap_lo.to_le_bytes());
 
                     if let Some(fc) = &params.filter_column {
-                        if params.agg_column.as_ref() != Some(fc) {
+                        // The filter column must match the effective binding column.
+                        // SUM(salary) WHERE dept='X' is rejected (different columns).
+                        // COUNT(*) WHERE amount>50000 is allowed (filter col IS the binding col).
+                        let binding_col = agg_col_resolved.as_deref().unwrap_or("");
+                        if binding_col != fc.as_str() {
                             return Err(crate::types::ZkDbError::internal(format!(
-                                "Aggregation column and filter column must match in this zkDB prototype. Agg='{:?}', Filter='{}'",
-                                params.agg_column, fc
+                                "Filter column '{}' must match aggregation column '{:?}' in this zkDB prototype. \
+                                 Cross-column filter (e.g. SUM(salary) WHERE dept=X) is not yet supported.",
+                                fc, params.agg_column
                             )));
                         }
                         match params.filter_op.as_deref() {

@@ -40,18 +40,85 @@ pub struct ProofResponse {
     pub snapshot_root_hex: String,
     pub query_hash_hex: String,
     /// Blake3 outer hash — **NOT circuit-proved**. For correlation/audit only.
-    /// Do NOT use this for security-critical checks. Use `result_commit_poseidon_proved_hex`.
     pub unsafe_metadata_commitment_hex: String,
-    /// Poseidon in-circuit result commitment — **circuit-proved**.
-    /// This is the authoritative security-relevant commitment.
-    /// Encoded as a 16-character hex string (8 bytes / 64-bit Goldilocks element).
+    /// Poseidon in-circuit result commitment — **circuit-proved** (PI[4]).
     pub result_commit_poseidon_proved_hex: String,
+    // ── Proved aggregate values (PI[2], PI[3]) ───────────────────────────────
+    /// Sum of the target column across selected rows. Circuit-proved (PI[2]).
+    /// For COUNT(*) this is 0. For AVG, avg = result_sum / result_row_count.
+    pub result_sum: u64,
+    /// Number of rows matching the query predicate. Circuit-proved (PI[3]).
     pub result_row_count: u64,
+    // ── All public inputs (for display / verification) ────────────────────────
+    pub public_inputs: AllPublicInputs,
     pub created_at_ms: u64,
+}
+
+/// All circuit public inputs exposed for UI / downstream consumers.
+#[derive(Debug, Serialize)]
+pub struct AllPublicInputs {
+    /// PI[0] lo — Poseidon(column_values)[0]: snapshot data binding.
+    pub snap_lo_hex: String,
+    /// PI[1] — Blake3(SQL text): query binding.
+    pub query_hash_hex: String,
+    /// PI[2] — SUM of values over selected rows (AggCircuit). 0 for non-Agg.
+    pub result_sum: u64,
+    /// PI[3] — COUNT of selected rows.
+    pub result_row_count: u64,
+    /// PI[4] — result_commit_lo (AggCircuit) OR join_right_snap_lo (JoinCircuit).
+    pub result_commit_or_join_right_hex: String,
+    /// PI[5] — group_output_lo (GroupBy) OR sort_secondary_snap_lo (Sort).
+    pub group_output_or_sort_snap_hex: String,
+    /// PI[6] — sort_secondary_hi (Sort). 0 for non-Sort.
+    pub sort_secondary_hi_snap_lo_hex: String,
+    /// PI[7] — group_vals_snap_lo (GroupBy) OR agg_n_real (Agg).
+    pub group_vals_or_n_real: u64,
+    // Named raw fields
+    pub agg_n_real: u64,
+    pub pred_op: u64,
+    pub pred_val: u64,
+    pub sort_secondary_snap_lo_hex: String,
+    pub sort_secondary_hi_snap_lo_hex_2: String,
+    pub join_right_snap_lo_hex: String,
+    pub join_unmatched_count: u64,
+    pub group_output_lo_hex: String,
+    pub group_vals_snap_lo_hex: String,
 }
 
 impl From<ProofArtifact> for ProofResponse {
     fn from(a: ProofArtifact) -> Self {
+        let pi = &a.public_inputs;
+        // Extract lo 8 bytes of snapshot_root as u64 for display
+        let snap_lo = u64::from_le_bytes(pi.snapshot_root[..8].try_into().unwrap_or([0u8; 8]));
+
+        let public_inputs = AllPublicInputs {
+            snap_lo_hex: format!("{:#018x}", snap_lo),
+            query_hash_hex: hex::encode(pi.query_hash),
+            result_sum: pi.result_sum,
+            result_row_count: pi.result_row_count,
+            result_commit_or_join_right_hex: if pi.join_right_snap_lo != 0 {
+                format!("{:#018x}", pi.join_right_snap_lo)
+            } else {
+                format!("{:#018x}", pi.result_commit_lo)
+            },
+            group_output_or_sort_snap_hex: if pi.group_output_lo != 0 {
+                format!("{:#018x}", pi.group_output_lo)
+            } else {
+                format!("{:#018x}", pi.sort_secondary_snap_lo)
+            },
+            sort_secondary_hi_snap_lo_hex: format!("{:#018x}", pi.sort_secondary_hi_snap_lo),
+            group_vals_or_n_real: if pi.group_vals_snap_lo != 0 { pi.group_vals_snap_lo } else { pi.agg_n_real },
+            agg_n_real: pi.agg_n_real,
+            pred_op: pi.pred_op,
+            pred_val: pi.pred_val,
+            sort_secondary_snap_lo_hex: format!("{:#018x}", pi.sort_secondary_snap_lo),
+            sort_secondary_hi_snap_lo_hex_2: format!("{:#018x}", pi.sort_secondary_hi_snap_lo),
+            join_right_snap_lo_hex: format!("{:#018x}", pi.join_right_snap_lo),
+            join_unmatched_count: pi.join_unmatched_count,
+            group_output_lo_hex: format!("{:#018x}", pi.group_output_lo),
+            group_vals_snap_lo_hex: format!("{:#018x}", pi.group_vals_snap_lo),
+        };
+
         Self {
             proof_id: a.proof_id.to_string(),
             query_id: a.query_id.to_string(),
@@ -71,7 +138,9 @@ impl From<ProofArtifact> for ProofResponse {
             result_commit_poseidon_proved_hex: hex::encode(
                 a.public_inputs.result_commit_lo.to_le_bytes(),
             ),
-            result_row_count: a.public_inputs.result_row_count,
+            result_sum: pi.result_sum,
+            result_row_count: pi.result_row_count,
+            public_inputs,
             created_at_ms: a.created_at_ms,
         }
     }

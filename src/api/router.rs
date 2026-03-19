@@ -15,6 +15,7 @@ use crate::api::{
     state::AppState,
 };
 use axum::{
+    extract::State,
     routing::{get, post},
     Router,
 };
@@ -49,6 +50,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/benchmarks/:run_id", get(get_benchmark))
         // Job routes
         .route("/v1/jobs/:job_id", get(get_job))
+        // System info
+        .route("/v1/system/info", get(system_info))
         // Health
         .route("/health", get(health))
         .layer(TraceLayer::new_for_http())
@@ -58,4 +61,34 @@ pub fn build_router(state: AppState) -> Router {
 
 async fn health() -> axum::Json<serde_json::Value> {
     axum::Json(serde_json::json!({ "status": "ok", "service": "zkdb" }))
+}
+
+async fn system_info(State(state): State<AppState>) -> axum::Json<serde_json::Value> {
+    let backends: Vec<serde_json::Value> = state
+        .provers
+        .keys()
+        .map(|name| {
+            let (zk, succinct, label) = match name.as_str() {
+                "plonky2" => (true, true, "Plonky2 SNARK — FRI-based, Goldilocks field, zero-knowledge"),
+                "constraint_checked" => (false, false, "Hash-chain audit — real constraints, NOT zero-knowledge"),
+                _ => (false, false, "Unknown"),
+            };
+            serde_json::json!({
+                "name": name,
+                "has_zero_knowledge": zk,
+                "is_succinct": succinct,
+                "description": label,
+            })
+        })
+        .collect();
+
+    axum::Json(serde_json::json!({
+        "service": "zkdb",
+        "version": env!("CARGO_PKG_VERSION"),
+        "default_backend": state.default_backend,
+        "available_backends": backends,
+        "max_rows_per_circuit": 128,
+        "field": "Goldilocks (2^64 - 2^32 + 1)",
+        "hash": "Poseidon (PoseidonGoldilocksConfig)",
+    }))
 }

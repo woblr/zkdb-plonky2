@@ -1566,6 +1566,33 @@ impl ProvingBackend for Plonky2Backend {
             }
         }
 
+        // ── Validate WHERE clause for AggCircuit ────────────────────────────
+        // AggCircuit only supports numeric predicates (>, <, =) on the SAME
+        // column that is being aggregated.  Reject early with a clear error
+        // rather than silently ignoring the WHERE clause or miscounting rows.
+        let params = &plan.operator_params;
+        if let Some(fc) = &params.filter_column {
+            // String literal predicate: filter_op set but filter_value absent
+            if params.filter_op.is_some() && params.filter_value.is_none() {
+                return Err(ZkDbError::Proving(format!(
+                    "UNSUPPORTED: WHERE {fc} = '<string>' — string predicates are not \
+                     circuit-provable. AggCircuit only supports numeric WHERE clauses \
+                     (e.g. WHERE salary > 50000 where salary is a numeric column)."
+                )));
+            }
+            // Cross-column filter: filter column ≠ aggregation column
+            if let Some(agg_col) = &params.agg_column {
+                if fc != agg_col {
+                    return Err(ZkDbError::Proving(format!(
+                        "UNSUPPORTED: WHERE {fc} ... cannot be proved when aggregating '{agg_col}'. \
+                         The filter column must match the aggregation column in AggCircuit \
+                         (e.g. SUM(salary) WHERE salary > 50000). \
+                         Cross-column filters like SUM(salary) WHERE dept='X' are not yet supported."
+                    )));
+                }
+            }
+        }
+
         let op_kind = classify_plan_with_params(plan);
 
         let circuit_ref = match &op_kind {
@@ -1712,6 +1739,9 @@ impl ProvingBackend for Plonky2Backend {
         //   JoinCircuit:    PI[2]=sum, PI[3]=count, PI[4]=right_snap_lo, PI[5]=result_commit, PI[6]=unmatched_count
         //   GroupByCircuit: PI[2]=sum, PI[3]=count, PI[4]=num_groups, PI[5]=group_output_lo, PI[6]=result_commit, PI[7]=vals_snap_lo
         struct ProvePIs {
+            /// AggCircuit PI[3] = count of selected rows within the circuit window.
+            /// Zero for all other circuits (count_lo is only cross-checked for TAG_AGG).
+            count_lo: u64,
             result_sum: u64,
             result_commit_lo: u64,
             pred_op: u64,
@@ -1737,6 +1767,7 @@ impl ProvingBackend for Plonky2Backend {
                                 p.public_inputs.get(i).map(|x| x.to_canonical_u64()).unwrap_or(0)
                             };
                             ProvePIs {
+                                count_lo: get(3),   // PI[3] = count of selected rows (circuit-proved)
                                 result_sum: get(2),
                                 result_commit_lo: get(4),
                                 pred_op: get(5),
@@ -1748,10 +1779,10 @@ impl ProvingBackend for Plonky2Backend {
                                 agg_n_real: get(7), // PI[7] = n_real
                             }
                         })
-                        .unwrap_or(ProvePIs { result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
+                        .unwrap_or(ProvePIs { count_lo: 0, result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
                 })
                 .await
-                .unwrap_or(ProvePIs { result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
+                .unwrap_or(ProvePIs { count_lo: 0, result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
             }
             PlonkyCircuitRef::Sort(_) => {
                 let c = self.sort_circuit();
@@ -1763,21 +1794,22 @@ impl ProvingBackend for Plonky2Backend {
                                 p.public_inputs.get(i).map(|x| x.to_canonical_u64()).unwrap_or(0)
                             };
                             ProvePIs {
-                                result_sum: 0,
+                                count_lo: get(3), // PI[3] = count_sel (non-padding rows)
+                                result_sum: get(2), // PI[2] = sum_sel (sum of sorted column)
                                 result_commit_lo: get(4),
                                 pred_op: 0,
                                 pred_val: 0,
                                 sort_secondary_snap_lo: get(5),
-                                sort_secondary_hi_snap_lo: get(6), // PI[6] = hi fingerprint commitment
+                                sort_secondary_hi_snap_lo: get(6),
                                 join_unmatched_count: 0,
                                 group_vals_snap_lo: 0,
                                 agg_n_real: 0,
                             }
                         })
-                        .unwrap_or(ProvePIs { result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
+                        .unwrap_or(ProvePIs { count_lo: 0, result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
                 })
                 .await
-                .unwrap_or(ProvePIs { result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
+                .unwrap_or(ProvePIs { count_lo: 0, result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
             }
             PlonkyCircuitRef::DescSort(_) => {
                 let c = self.desc_sort_circuit();
@@ -1789,7 +1821,8 @@ impl ProvingBackend for Plonky2Backend {
                                 p.public_inputs.get(i).map(|x| x.to_canonical_u64()).unwrap_or(0)
                             };
                             ProvePIs {
-                                result_sum: 0,
+                                count_lo: get(3), // PI[3] = count_sel (non-padding rows)
+                                result_sum: get(2), // PI[2] = sum_sel (sum of sorted column)
                                 result_commit_lo: get(4),
                                 pred_op: 0,
                                 pred_val: 0,
@@ -1800,10 +1833,10 @@ impl ProvingBackend for Plonky2Backend {
                                 agg_n_real: 0,
                             }
                         })
-                        .unwrap_or(ProvePIs { result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
+                        .unwrap_or(ProvePIs { count_lo: 0, result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
                 })
                 .await
-                .unwrap_or(ProvePIs { result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
+                .unwrap_or(ProvePIs { count_lo: 0, result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
             }
             PlonkyCircuitRef::Join(_) => {
                 let c = self.join_circuit();
@@ -1815,6 +1848,7 @@ impl ProvingBackend for Plonky2Backend {
                                 p.public_inputs.get(i).map(|x| x.to_canonical_u64()).unwrap_or(0)
                             };
                             ProvePIs {
+                                count_lo: 0,
                                 result_sum: get(2),
                                 result_commit_lo: get(5),
                                 pred_op: 0,
@@ -1826,10 +1860,10 @@ impl ProvingBackend for Plonky2Backend {
                                 agg_n_real: 0,
                             }
                         })
-                        .unwrap_or(ProvePIs { result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
+                        .unwrap_or(ProvePIs { count_lo: 0, result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
                 })
                 .await
-                .unwrap_or(ProvePIs { result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
+                .unwrap_or(ProvePIs { count_lo: 0, result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
             }
             PlonkyCircuitRef::GroupBy(_) => {
                 let c = self.group_by_circuit();
@@ -1841,6 +1875,7 @@ impl ProvingBackend for Plonky2Backend {
                                 p.public_inputs.get(i).map(|x| x.to_canonical_u64()).unwrap_or(0)
                             };
                             ProvePIs {
+                                count_lo: 0,
                                 result_sum: get(2),
                                 result_commit_lo: get(6),
                                 pred_op: 0,
@@ -1852,10 +1887,10 @@ impl ProvingBackend for Plonky2Backend {
                                 agg_n_real: 0,
                             }
                         })
-                        .unwrap_or(ProvePIs { result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
+                        .unwrap_or(ProvePIs { count_lo: 0, result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
                 })
                 .await
-                .unwrap_or(ProvePIs { result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
+                .unwrap_or(ProvePIs { count_lo: 0, result_sum: 0, result_commit_lo: 0, pred_op: 0, pred_val: 0, sort_secondary_snap_lo: 0, sort_secondary_hi_snap_lo: 0, join_unmatched_count: 0, group_vals_snap_lo: 0, agg_n_real: 0 })
             }
         };
         let result_sum               = prove_pis.result_sum;
@@ -1867,6 +1902,17 @@ impl ProvingBackend for Plonky2Backend {
         let join_unmatched_count      = prove_pis.join_unmatched_count;
         let group_vals_snap_lo        = prove_pis.group_vals_snap_lo;
         let agg_n_real                = prove_pis.agg_n_real;
+        // Use the circuit-proved PI[3] count when available (Agg, Sort, DescSort all set it).
+        // This prevents a count mismatch in verify when the dataset has more rows than
+        // MAX_ROWS (128), since the circuit only proves within its window.
+        // GroupBy and Join leave count_lo = 0, so they fall back to witness.result_row_count.
+        let result_row_count = if prove_pis.count_lo > 0
+            || matches!(handle.circuit_ref, PlonkyCircuitRef::Agg(_))
+        {
+            prove_pis.count_lo
+        } else {
+            witness.result_row_count
+        };
 
         Ok(ProofArtifact {
             proof_id: ProofId::new(),
@@ -1889,7 +1935,7 @@ impl ProvingBackend for Plonky2Backend {
                 snapshot_root: witness.snapshot_root,
                 query_hash: witness.query_hash,
                 result_commitment,
-                result_row_count: witness.result_row_count,
+                result_row_count,
                 result_sum,
                 result_commit_lo,
                 group_output_lo,

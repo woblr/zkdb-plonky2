@@ -70,9 +70,10 @@ pub async fn submit_query(
     }));
 
     // Run proof pipeline (synchronous inline — the prover blocks until proof is complete)
+    let prover = state.get_prover(&req.backend);
     let proof_result = async {
         let proof_plan = state.query_service.build_proof_plan(&normalized).await?;
-        let artifact = state.prover.prove(&normalized, &proof_plan).await?;
+        let artifact = prover.prove(&normalized, &proof_plan).await?;
         Ok::<_, ZkDbError>(artifact)
     }
     .await;

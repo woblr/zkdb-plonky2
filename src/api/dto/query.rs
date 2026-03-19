@@ -10,6 +10,14 @@ pub struct SubmitQueryRequest {
     pub sql: String,
     #[serde(default)]
     pub snapshot_id: Option<String>,
+    /// Backend to use for proving: "plonky2" or "constraint_checked".
+    /// Defaults to "plonky2".
+    #[serde(default = "default_backend")]
+    pub backend: String,
+}
+
+fn default_backend() -> String {
+    "plonky2".to_string()
 }
 
 #[derive(Debug, Serialize)]

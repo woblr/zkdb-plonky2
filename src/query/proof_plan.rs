@@ -253,26 +253,37 @@ impl ProofPlanner {
             PhysicalNode::PartialAggregate {
                 group_by,
                 aggregates,
-                ..
+                input,
+            } => {
+                // Recurse into input to propagate Filter params (filter_op, filter_value, etc.)
+                let mut p = Self::extract_operator_params(input);
+                p.group_by_column = group_by.first().and_then(|e| match e {
+                    crate::query::ast::Expr::Column { name, .. } => Some(name.clone()),
+                    _ => None,
+                });
+                p.agg_column = aggregates.first().and_then(|a| match &a.input {
+                    crate::query::ast::Expr::Column { name, .. } => Some(name.clone()),
+                    _ => None,
+                });
+                p
             }
-            | PhysicalNode::MergeAggregate {
+            PhysicalNode::MergeAggregate {
                 group_by,
                 aggregates,
+                input,
                 ..
             } => {
-                let gb_col = group_by.first().and_then(|e| match e {
+                // Recurse into input to propagate Filter params (filter_op, filter_value, etc.)
+                let mut p = Self::extract_operator_params(input);
+                p.group_by_column = group_by.first().and_then(|e| match e {
                     crate::query::ast::Expr::Column { name, .. } => Some(name.clone()),
                     _ => None,
                 });
-                let agg_col = aggregates.first().and_then(|a| match &a.input {
+                p.agg_column = aggregates.first().and_then(|a| match &a.input {
                     crate::query::ast::Expr::Column { name, .. } => Some(name.clone()),
                     _ => None,
                 });
-                OperatorParams {
-                    group_by_column: gb_col,
-                    agg_column: agg_col,
-                    ..Default::default()
-                }
+                p
             }
             PhysicalNode::HashJoin {
                 condition,
