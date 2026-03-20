@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "zkDB — Zero-Knowledge Database",
-  description: "Verifiable database queries with real Plonky2 FRI-based SNARK proofs",
+  title: "zkDB: Plonky2 Zero-Knowledge Database",
+  description: "A production-grade verifiable SQL database prototype powered by Plonky2 FRI-SNARKs. Execute real ZK queries with Poseidon anchors and Blake3 metadata commitments.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
