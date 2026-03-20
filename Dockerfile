@@ -12,6 +12,9 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY tests ./tests
 
+# plonky2 requires nightly rust
+RUN rustup toolchain install nightly && rustup default nightly
+
 # Build the release binary
 RUN cargo build --release
 
