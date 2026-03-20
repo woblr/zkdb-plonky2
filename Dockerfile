@@ -1,7 +1,7 @@
 # ==========================================
 # 1. Rust Builder Stage
 # ==========================================
-FROM rust:1.80-slim-bookworm AS rust-builder
+FROM rust:slim-bookworm AS rust-builder
 WORKDIR /app
 
 # Install build dependencies
