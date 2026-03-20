@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY tests ./tests
-COPY benches ./benches
 
 # Build the release binary
 RUN cargo build --release
