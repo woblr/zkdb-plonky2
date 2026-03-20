@@ -5,6 +5,13 @@ import { api, Proof, VerificationResponse, AllPublicInputs } from "@/lib/api";
 import { setupDemoDatasets, DemoState } from "@/lib/demo";
 import { PRESET_QUERIES, PresetQuery, CATEGORY_LABELS } from "@/lib/presets";
 import {
+  validateAndParse,
+  ingestCustomDataset,
+  generateCustomPresets,
+  CustomDatasetState,
+  LIMITS,
+} from "@/lib/custom-dataset";
+import {
   Shield,
   ShieldCheck,
   ShieldAlert,
@@ -26,6 +33,8 @@ import {
   Code2,
   Binary,
   Braces,
+  TableProperties,
+  AlertCircle,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -284,6 +293,223 @@ function ProofExplorer({ proof }: { proof: Proof }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Dataset Uploader ─────────────────────────────────────────────────────────
+
+interface DatasetUploaderProps {
+  onReady: (state: CustomDatasetState, presets: PresetQuery[]) => void;
+  onProgress: (msg: string) => void;
+}
+
+function DatasetUploader({ onReady, onProgress }: DatasetUploaderProps) {
+  const [jsonText, setJsonText] = useState<string>("");
+  const [validation, setValidation] = useState<ReturnType<typeof validateAndParse> | null>(null);
+  const [inputBytes, setInputBytes] = useState<number>(0);
+  const [ingesting, setIngesting] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  function bytesOf(s: string) {
+    return new TextEncoder().encode(s).byteLength;
+  }
+
+  function handleValidate() {
+    setUploadError(null);
+    const bytes = bytesOf(jsonText);
+    setInputBytes(bytes);
+    setValidation(validateAndParse(jsonText, bytes));
+  }
+
+  async function handleIngest() {
+    if (!validation?.ok) return;
+    setIngesting(true);
+    setUploadError(null);
+    const tableName = `custom_data`;
+    try {
+      const state = await ingestCustomDataset(validation, tableName, onProgress);
+      const presets = generateCustomPresets(state);
+      onReady(state, presets);
+    } catch (e: unknown) {
+      setUploadError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIngesting(false);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ background: "rgba(77,159,255,0.04)", border: "1px solid rgba(77,159,255,0.18)", borderRadius: 8, padding: 12 }}>
+        <div style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-dim)", marginBottom: 8 }}>
+          Paste JSON DB (flat rows)
+        </div>
+
+        <textarea
+          value={jsonText}
+          onChange={(e) => setJsonText(e.target.value)}
+          placeholder={`[
+  {"id": 1, "score": 42},
+  {"id": 2, "score": 7}
+]`}
+          spellCheck={false}
+          style={{
+            width: "100%",
+            minHeight: 140,
+            background: "#0d0f15",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            padding: "10px 12px",
+            color: "var(--text)",
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 12,
+            lineHeight: 1.6,
+            resize: "vertical",
+            outline: "none",
+          }}
+        />
+
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <button
+            onClick={handleValidate}
+            disabled={ingesting}
+            style={{
+              flex: 1,
+              padding: "10px 0",
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              cursor: ingesting ? "not-allowed" : "pointer",
+              color: "var(--text)",
+              fontWeight: 600,
+              fontSize: 13,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              fontFamily: "inherit",
+            }}
+          >
+            <TableProperties size={14} />
+            Validate & Preview
+          </button>
+
+          <button
+            onClick={handleIngest}
+            disabled={ingesting || !validation?.ok}
+            style={{
+              flex: 1,
+              padding: "10px 0",
+              background: ingesting ? "rgba(0,229,160,0.1)" : "rgba(0,229,160,0.15)",
+              border: "1px solid rgba(0,229,160,0.35)",
+              borderRadius: 6,
+              cursor: ingesting || !validation?.ok ? "not-allowed" : "pointer",
+              color: ingesting ? "var(--accent-green)" : "var(--accent-green)",
+              fontWeight: 700,
+              fontSize: 13,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              fontFamily: "inherit",
+            }}
+          >
+            {ingesting ? (
+              <>
+                <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+                Creating dataset…
+              </>
+            ) : (
+              <>Ingest & Generate Presets</>
+            )}
+          </button>
+        </div>
+
+        <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.6 }}>
+          Constraints: max {LIMITS.MAX_ROWS.toLocaleString()} rows · {LIMITS.MAX_COLS} columns · max{" "}
+          {(LIMITS.MAX_JSON_BYTES / 1024 / 1024).toFixed(1)} MB · flat objects only · reserved keys like `__proto__` rejected.
+        </div>
+
+        {inputBytes > 0 && (
+          <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-muted)" }}>
+            Input size: {fmtBytes(inputBytes)}
+          </div>
+        )}
+      </div>
+
+      {validation && (
+        <div style={{ marginTop: 12 }}>
+          {validation.errors.length > 0 && (
+            <div style={{ background: "rgba(255,77,106,0.08)", border: "1px solid rgba(255,77,106,0.25)", borderRadius: 6, padding: "10px 12px", marginBottom: 8 }}>
+              {validation.errors.map((e, i) => (
+                <div key={i} style={{ fontSize: 11, color: "var(--accent-red)", display: "flex", gap: 6 }}>
+                  <AlertCircle size={12} style={{ flexShrink: 0, marginTop: 1 }} />
+                  {e}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {validation.warnings.length > 0 && (
+            <div style={{ background: "rgba(255,162,0,0.06)", border: "1px solid rgba(255,162,0,0.2)", borderRadius: 6, padding: "8px 12px", marginBottom: 8 }}>
+              {validation.warnings.map((w, i) => (
+                <div key={i} style={{ fontSize: 11, color: "var(--accent-amber)", display: "flex", gap: 6 }}>
+                  <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 1 }} />
+                  {w}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {validation.ok && (
+            <div style={{ background: "rgba(0,229,160,0.04)", border: "1px solid rgba(0,229,160,0.15)", borderRadius: 6, padding: "10px 12px", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: "var(--accent-green)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+                <CheckCircle2 size={11} style={{ display: "inline", marginRight: 4 }} />
+                {validation.rowCount} rows · {validation.columns.length} columns detected
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+                {validation.columns.map((col) => (
+                  <div
+                    key={col.name}
+                    style={{
+                      background: "var(--surface)",
+                      border: `1px solid ${col.circuitCompatible ? "rgba(0,229,160,0.2)" : "rgba(255,162,0,0.2)"}`,
+                      borderRadius: 4,
+                      padding: "5px 8px",
+                      fontSize: 10,
+                    }}
+                    title={col.warning}
+                  >
+                    <div style={{ fontFamily: "monospace", color: col.circuitCompatible ? "var(--accent-green)" : "var(--accent-amber)" }}>
+                      {col.name}
+                    </div>
+                    <div style={{ color: "var(--text-dim)", marginTop: 1 }}>
+                      {col.type}
+                      {!col.circuitCompatible && " ⚠"}
+                    </div>
+                    {col.sampleValues.length > 0 && (
+                      <div style={{ color: "var(--text-muted)", fontSize: 9, marginTop: 1 }}>
+                        e.g. {col.sampleValues[0]}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {validation.columns.some((c) => !c.circuitCompatible) && (
+                <div style={{ fontSize: 10, color: "var(--accent-amber)", marginTop: 8 }}>
+                  ⚠ Text columns shown in orange cannot be used in circuit queries (sort/filter/groupby).
+                </div>
+              )}
+            </div>
+          )}
+
+          {uploadError && (
+            <div style={{ background: "rgba(255,77,106,0.08)", border: "1px solid rgba(255,77,106,0.25)", borderRadius: 6, padding: "8px 12px", marginTop: 8, fontSize: 11, color: "var(--accent-red)" }}>
+              {uploadError}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -769,6 +995,9 @@ export default function Home() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [setupLog, setSetupLog] = useState<string[]>([]);
   const [demo, setDemo] = useState<DemoState | null>(null);
+  const [datasetMode, setDatasetMode] = useState<"demo" | "custom">("demo");
+  const [customDataset, setCustomDataset] = useState<CustomDatasetState | null>(null);
+  const [customPresets, setCustomPresets] = useState<PresetQuery[] | null>(null);
   const [systemInfo, setSystemInfo] = useState<Awaited<ReturnType<typeof api.systemInfo>> | null>(null);
   const [sql, setSql] = useState(PRESET_QUERIES[0].sql);
   const [selectedPreset, setSelectedPreset] = useState<PresetQuery>(PRESET_QUERIES[0]);
@@ -801,27 +1030,45 @@ export default function Home() {
     setError(null);
     setRun(null);
 
-    let demoState = demo;
-    if (!demoState) {
-      setPhase("setting-up");
-      setSetupLog([]);
-      try {
-        demoState = await setupDemoDatasets(100, (msg) =>
-          setSetupLog((prev) => [...prev, msg])
-        );
-        setDemo(demoState);
-      } catch (e: unknown) {
-        setError(`Setup failed: ${e instanceof Error ? e.message : String(e)}`);
+    let datasetId: string | null = null;
+
+    if (datasetMode === "demo") {
+      let demoState = demo;
+      if (!demoState) {
+        setPhase("setting-up");
+        setSetupLog([]);
+        try {
+          demoState = await setupDemoDatasets(100, (msg) =>
+            setSetupLog((prev) => [...prev, msg])
+          );
+          setDemo(demoState);
+        } catch (e: unknown) {
+          setError(`Setup failed: ${e instanceof Error ? e.message : String(e)}`);
+          setPhase("error");
+          return;
+        }
+      }
+
+      const target = detectDataset(sql, demoState);
+      if (!target) {
+        setError("Cannot detect dataset from SQL.");
         setPhase("error");
         return;
       }
-    }
-
-    const target = detectDataset(sql, demoState);
-    if (!target) {
-      setError("Cannot detect dataset from SQL.");
-      setPhase("error");
-      return;
+      datasetId = target.datasetId;
+    } else {
+      if (!customDataset) {
+        setError("Custom dataset is not ingested yet. Paste JSON and click \"Ingest & Generate Presets\".");
+        setPhase("error");
+        return;
+      }
+      // Prevent accidental mixing of demo SQL with the custom dataset.
+      if (!/\bfrom\s+custom_data\b/i.test(sql)) {
+        setError("In custom mode, SQL must query `custom_data` (the ingested table).");
+        setPhase("error");
+        return;
+      }
+      datasetId = customDataset.datasetId;
     }
 
     setPhase("proving");
@@ -829,7 +1076,7 @@ export default function Home() {
 
     try {
       const submitted = await api.submitQuery({
-        dataset_id: target.datasetId,
+        dataset_id: datasetId!,
         sql,
         backend: "plonky2",
       });
@@ -876,9 +1123,16 @@ export default function Home() {
     setError(null);
     setSetupLog([]);
     setDemo(null);
+    setDatasetMode("demo");
+    setCustomDataset(null);
+    setCustomPresets(null);
+    setSql(PRESET_QUERIES[0].sql);
+    setSelectedPreset(PRESET_QUERIES[0]);
+    setShowPresets(false);
   }
 
-  const presetsByCategory = PRESET_QUERIES.reduce(
+  const effectivePresets = datasetMode === "custom" ? (customPresets ?? []) : PRESET_QUERIES;
+  const presetsByCategory = effectivePresets.reduce(
     (acc, p) => { (acc[p.category] ??= []).push(p); return acc; },
     {} as Record<string, PresetQuery[]>
   );
@@ -982,11 +1236,88 @@ export default function Home() {
             </div>
           </Section>
 
+          {/* Dataset source */}
+          <Section title="Dataset Source">
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <button
+                onClick={() => {
+                  setDatasetMode("demo");
+                  setSelectedPreset(PRESET_QUERIES[0]);
+                  setSql(PRESET_QUERIES[0].sql);
+                  setShowPresets(false);
+                  setRun(null);
+                  setError(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "10px 0",
+                  background: datasetMode === "demo" ? "rgba(0,229,160,0.15)" : "var(--surface)",
+                  border: `1px solid ${datasetMode === "demo" ? "rgba(0,229,160,0.35)" : "var(--border)"}`,
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  color: datasetMode === "demo" ? "var(--accent-green)" : "var(--text-dim)",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                }}
+              >
+                Demo DB
+              </button>
+
+              <button
+                onClick={() => {
+                  setDatasetMode("custom");
+                  setRun(null);
+                  setError(null);
+                  setShowPresets(false);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "10px 0",
+                  background: datasetMode === "custom" ? "rgba(77,159,255,0.12)" : "var(--surface)",
+                  border: `1px solid ${datasetMode === "custom" ? "rgba(77,159,255,0.25)" : "var(--border)"}`,
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  color: datasetMode === "custom" ? "var(--accent-blue)" : "var(--text-dim)",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                }}
+              >
+                Custom JSON
+              </button>
+            </div>
+
+            {datasetMode === "demo" ? (
+              <div style={{ background: "rgba(0,229,160,0.04)", border: "1px solid rgba(0,229,160,0.15)", borderRadius: 8, padding: 12, fontSize: 11, color: "var(--text-dim)", lineHeight: 1.6 }}>
+                Default demo DB is created automatically on first run (up to 100 rows per dataset).
+              </div>
+            ) : (
+              <DatasetUploader
+                onProgress={(msg) => setSetupLog((prev) => [...prev, msg])}
+                onReady={(state, presets) => {
+                  setCustomDataset(state);
+                  setCustomPresets(presets);
+                  setDatasetMode("custom");
+                  setShowPresets(false);
+                  const first = presets[0] ?? PRESET_QUERIES[0];
+                  setSelectedPreset(first);
+                  setSql(first.sql);
+                  setRun(null);
+                  setError(null);
+                }}
+              />
+            )}
+          </Section>
+
           {/* Preset dropdown */}
           <Section title="Preset Queries">
             <div ref={presetRef} style={{ position: "relative" }}>
               <button
-                onClick={() => setShowPresets(!showPresets)}
+                onClick={() => {
+                  if (datasetMode === "custom" && effectivePresets.length === 0) return;
+                  setShowPresets(!showPresets);
+                }}
                 style={{
                   width: "100%",
                   background: "var(--surface)",
@@ -1118,7 +1449,7 @@ export default function Home() {
               {isRunning ? (
                 <>
                   <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
-                  {phase === "setting-up" ? "Creating datasets (200 rows)…" : "Generating ZK proof…"}
+                  {phase === "setting-up" ? "Creating datasets (100 rows)…" : "Generating ZK proof…"}
                 </>
               ) : (
                 <><Play size={14} />Run & Prove</>
