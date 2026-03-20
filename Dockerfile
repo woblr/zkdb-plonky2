@@ -49,7 +49,7 @@ ENV HOSTNAME="0.0.0.0"
 ENV NEXT_PUBLIC_API_URL="http://localhost:3001"
 
 # Copy the Rust binary from rust-builder
-COPY --from=rust-builder /app/target/release/zkdb-plonky2 ./zkdb-plonky2
+COPY --from=rust-builder /app/target/release/zkdb ./zkdb
 
 # Copy the standalone Next.js build from node-builder
 COPY --from=node-builder /app/frontend/.next/standalone/ ./frontend/
