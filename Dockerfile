@@ -15,6 +15,10 @@ COPY tests ./tests
 # plonky2 requires nightly rust
 RUN rustup toolchain install nightly && rustup default nightly
 
+# Enable native CPU instructions (AVX2/AVX512). Coolify builds and runs on
+# the same machine, so native is safe here.
+ENV RUSTFLAGS="-C target-cpu=native"
+
 # Build the release binary
 RUN cargo build --release
 

@@ -1517,7 +1517,7 @@ export default function Home() {
               </div>
               <div className="proving-shimmer" style={{ width: 300, height: 3, borderRadius: 2 }} />
               <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                Debug build: ~3–8 seconds. Release build (~50× faster): cargo run --release
+                Generating zero-knowledge proof…
               </div>
             </div>
           )}
@@ -1543,7 +1543,7 @@ export default function Home() {
               {/* Metrics */}
               <Section title="Proof Metrics">
                 <div style={{ display: "flex", gap: 10 }}>
-                  <MetricBox icon={<Timer size={14} />} label="Proof Generation" value={fmtMs(run.proofMs)} sub="wall-clock (debug build)" color="var(--accent-green)" />
+                  <MetricBox icon={<Timer size={14} />} label="Proof Generation" value={fmtMs(run.proofMs)} sub="release · native CPU" color="var(--accent-green)" />
                   <MetricBox icon={<Timer size={14} />} label="Verification Time" value={run.verifyMs != null ? fmtMs(run.verifyMs) : "—"} sub={run.verifyMs != null ? "O(log² n)" : "click Verify below"} />
                   <MetricBox icon={<FileDigit size={14} />} label="Proof Size" value={fmtBytes(Math.ceil(run.proof.proof_hex.length / 2))} sub="FRI — constant regardless of rows" />
                   <MetricBox icon={<Hash size={14} />} label="Dataset Size" value={`${run.proof.public_inputs.agg_n_real || run.proof.result_row_count} rows`} sub="PI[7] n_real or count" />
